@@ -11,10 +11,22 @@ async function getAccessToken(): Promise<string> {
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
   const refreshToken = Deno.env.get('GOOGLE_REFRESH_TOKEN');
 
+  console.log('Checking OAuth credentials...', {
+    hasClientId: !!clientId,
+    hasClientSecret: !!clientSecret,
+    hasRefreshToken: !!refreshToken,
+    refreshTokenLength: refreshToken?.length || 0,
+  });
+
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Missing Google OAuth credentials');
+    const missing = [];
+    if (!clientId) missing.push('GOOGLE_CLIENT_ID');
+    if (!clientSecret) missing.push('GOOGLE_CLIENT_SECRET');
+    if (!refreshToken) missing.push('GOOGLE_REFRESH_TOKEN');
+    throw new Error(`Missing Google OAuth credentials: ${missing.join(', ')}`);
   }
 
+  console.log('Requesting access token from Google...');
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -26,13 +38,22 @@ async function getAccessToken(): Promise<string> {
     }),
   });
 
+  const responseText = await response.text();
+  console.log('Token refresh response status:', response.status);
+
   if (!response.ok) {
-    const error = await response.text();
-    console.error('Token refresh error:', error);
-    throw new Error('Failed to refresh access token');
+    console.error('Token refresh error response:', responseText);
+    // Try to parse for more specific error
+    try {
+      const errorData = JSON.parse(responseText);
+      throw new Error(`Token refresh failed: ${errorData.error} - ${errorData.error_description || 'No description'}`);
+    } catch (parseError) {
+      throw new Error(`Token refresh failed (${response.status}): ${responseText.substring(0, 200)}`);
+    }
   }
 
-  const data = await response.json();
+  const data = JSON.parse(responseText);
+  console.log('Access token obtained successfully');
   return data.access_token;
 }
 
@@ -98,9 +119,18 @@ async function fetchGoogleAdsMetrics(customerId: string, accessToken: string, da
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error('Google Ads API error:', error);
-    throw new Error(`Google Ads API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error('Google Ads API error:', { status: response.status, body: errorText });
+    // Try to parse for more specific error
+    try {
+      const errorData = JSON.parse(errorText);
+      const details = errorData.error?.details?.[0]?.errors?.[0]?.message || 
+                      errorData.error?.message || 
+                      errorText.substring(0, 300);
+      throw new Error(`Google Ads API error (${response.status}): ${details}`);
+    } catch (parseError) {
+      throw new Error(`Google Ads API error (${response.status}): ${errorText.substring(0, 300)}`);
+    }
   }
 
   const data = await response.json();
@@ -148,16 +178,22 @@ async function fetchGoogleAdsMetrics(customerId: string, accessToken: string, da
 }
 
 serve(async (req) => {
+  console.log('=== google-ads-metrics function invoked ===');
+  console.log('Method:', req.method);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { clientId, dateRange = 'LAST_30_DAYS' } = await req.json();
+    const body = await req.json();
+    const { clientId, dateRange = 'LAST_30_DAYS' } = body;
+    console.log('Request body:', { clientId, dateRange });
 
     if (!clientId) {
+      console.error('Missing clientId in request');
       return new Response(
-        JSON.stringify({ error: 'Client ID is required' }),
+        JSON.stringify({ error: 'Client ID is required', details: 'clientId parameter is missing from request body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -208,8 +244,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Edge function error:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error('Error stack:', stack);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: message, details: stack?.substring(0, 500) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
