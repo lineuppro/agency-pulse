@@ -180,12 +180,38 @@ async function fetchGoogleAdsMetrics(customerId: string, accessToken: string, da
 serve(async (req) => {
   console.log('=== google-ads-metrics function invoked ===');
   console.log('Method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Manual auth check (since verify_jwt is disabled for debugging)
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', details: 'Missing Authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+    
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+    if (authError || !user) {
+      console.error('Auth validation failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', details: authError?.message || 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    console.log('Authenticated user:', user.id);
+
     const body = await req.json();
     const { clientId, dateRange = 'LAST_30_DAYS' } = body;
     console.log('Request body:', { clientId, dateRange });
@@ -198,10 +224,9 @@ serve(async (req) => {
       );
     }
 
-    // Get client's Google Ads ID from database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Get client's Google Ads ID from database (reuse URL, use service role key)
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: client, error: clientError } = await supabase
       .from('clients')
