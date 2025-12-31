@@ -106,7 +106,7 @@ async function fetchGoogleAdsMetrics(customerId: string, accessToken: string, da
   console.log('Query:', query);
 
   const response = await fetch(
-    `https://googleads.googleapis.com/v18/customers/${cleanCustomerId}/googleAds:searchStream`,
+    `https://googleads.googleapis.com/v22/customers/${cleanCustomerId}/googleAds:searchStream`,
     {
       method: 'POST',
       headers: {
