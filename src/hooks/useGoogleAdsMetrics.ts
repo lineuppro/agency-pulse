@@ -27,8 +27,20 @@ export function useGoogleAdsMetrics() {
     setError(null);
 
     try {
+      // Ensure we always send a valid JWT to the backend function
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke('google-ads-metrics', {
         body: { clientId, dateRange },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (fnError) {
