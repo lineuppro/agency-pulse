@@ -32,20 +32,29 @@ export function useGoogleAdsMetrics() {
       });
 
       if (fnError) {
-        throw new Error(fnError.message);
+        // Extract more details from the error
+        const errorDetails = fnError.message || 'Unknown error';
+        const context = (fnError as any).context;
+        const status = context?.status || 'N/A';
+        const fullMessage = `Status ${status}: ${errorDetails}`;
+        console.error('Edge function error:', { status, errorDetails, context, fnError });
+        throw new Error(fullMessage);
       }
 
-      if (data.error) {
-        throw new Error(data.error);
+      if (data?.error) {
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error;
+        console.error('API returned error:', data);
+        throw new Error(errorMsg);
       }
 
       setMetrics(data.metrics);
       return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao buscar métricas';
+      console.error('useGoogleAdsMetrics error:', err);
       setError(message);
       toast({
-        title: 'Erro',
+        title: 'Erro ao buscar métricas',
         description: message,
         variant: 'destructive',
       });
