@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Layouts
@@ -31,52 +32,54 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
 
-            {/* Admin routes */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<AdminDashboard />} />
-              <Route path="clients" element={<AdminClients />} />
-              <Route path="tasks" element={<AdminTasks />} />
-              <Route path="chats" element={<AdminChats />} />
-              <Route path="settings" element={<AdminSettings />} />
-            </Route>
+              {/* Admin routes */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AdminDashboard />} />
+                <Route path="clients" element={<AdminClients />} />
+                <Route path="tasks" element={<AdminTasks />} />
+                <Route path="chats" element={<AdminChats />} />
+                <Route path="settings" element={<AdminSettings />} />
+              </Route>
 
-            {/* Client Portal routes */}
-            <Route
-              path="/portal"
-              element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <ClientLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<MeetingAgenda />} />
-              <Route path="performance" element={<Performance />} />
-              <Route path="chat" element={<Chat />} />
-            </Route>
+              {/* Client Portal routes */}
+              <Route
+                path="/portal"
+                element={
+                  <ProtectedRoute allowedRoles={['client']}>
+                    <ClientLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<MeetingAgenda />} />
+                <Route path="performance" element={<Performance />} />
+                <Route path="chat" element={<Chat />} />
+              </Route>
 
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

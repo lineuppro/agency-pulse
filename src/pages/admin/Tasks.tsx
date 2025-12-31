@@ -56,6 +56,7 @@ export default function AdminTasks() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
   const [formData, setFormData] = useState({
     client_id: '',
     title: '',
@@ -150,26 +151,44 @@ export default function AdminTasks() {
     { key: 'completed', label: 'Concluído' },
   ];
 
+  const filteredTasks = selectedClientFilter === 'all' 
+    ? tasks 
+    : tasks.filter(t => t.client_id === selectedClientFilter);
+
   const getTasksByStatus = (status: TaskStatus) => 
-    tasks.filter(t => t.status === status);
+    filteredTasks.filter(t => t.status === status);
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Tarefas</h1>
           <p className="text-muted-foreground mt-1">
             Gerencie as entregas de todos os clientes
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={clients.length === 0}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Tarefa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+        <div className="flex items-center gap-3">
+          <Select value={selectedClientFilter} onValueChange={setSelectedClientFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrar por cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os clientes</SelectItem>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button disabled={clients.length === 0}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Tarefa
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Nova Tarefa</DialogTitle>
               <DialogDescription>
@@ -254,7 +273,8 @@ export default function AdminTasks() {
               </div>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {clients.length === 0 && !loading ? (
