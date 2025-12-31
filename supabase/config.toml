@@ -1,1 +1,4 @@
 project_id = "vsqlwyabgfccszqycmto"
+
+[functions.google-ads-metrics]
+verify_jwt = true
