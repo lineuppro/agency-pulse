@@ -8,7 +8,8 @@ import {
   LogOut,
   Zap,
   Sun,
-  Moon
+  Moon,
+  BarChart3
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +32,7 @@ const menuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
   { title: 'Clientes', url: '/admin/clients', icon: Users },
   { title: 'Tarefas', url: '/admin/tasks', icon: CheckSquare },
+  { title: 'Performance', url: '/admin/performance', icon: BarChart3 },
   { title: 'Conversas', url: '/admin/chats', icon: MessageSquare },
   { title: 'Configurações', url: '/admin/settings', icon: Settings },
 ];
