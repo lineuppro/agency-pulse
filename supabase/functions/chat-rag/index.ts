@@ -200,24 +200,30 @@ function parseQuarterToDateRange(quarter: number, yearStr?: string): DateRange {
 }
 
 function parseMonthRangeToDateRange(
-  startMonth: string, 
-  endMonth: string, 
-  startYear?: string, 
+  startMonth: string,
+  endMonth: string,
+  startYear?: string,
   endYear?: string
 ): DateRange | null {
   const startMonthNum = MONTH_MAP[startMonth.toLowerCase()];
   const endMonthNum = MONTH_MAP[endMonth.toLowerCase()];
   if (!startMonthNum || !endMonthNum) return null;
-  
+
   const currentYear = new Date().getFullYear();
-  const sYear = startYear ? parseInt(startYear) : currentYear;
-  const eYear = endYear ? parseInt(endYear) : (startYear ? parseInt(startYear) : currentYear);
-  
+
+  // Infer missing years from the provided one (common in PT-BR queries)
+  // Example: "de janeiro a março de 2025" => startYear should be 2025.
+  const inferredStartYear = startYear ?? endYear ?? String(currentYear);
+  const inferredEndYear = endYear ?? startYear ?? String(currentYear);
+
+  const sYear = parseInt(inferredStartYear);
+  const eYear = parseInt(inferredEndYear);
+
   const lastDay = getLastDayOfMonth(eYear, endMonthNum);
-  
-  const monthNames = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 
-                      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  
+
+  const monthNames = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
   return {
     type: 'CUSTOM',
     customStart: `${sYear}-${startMonthNum.toString().padStart(2, '0')}-01`,
@@ -853,18 +859,58 @@ function calculateVariation(current: number, previous: number): string {
 }
 
 async function buildAdvancedAdsContext(
-  customerId: string, 
-  accessToken: string, 
+  customerId: string,
+  accessToken: string,
   intent: AdvancedUserIntent
 ): Promise<string> {
   let context = '\n\n📊 DADOS DO GOOGLE ADS:\n';
-  
+
+  const today = new Date().toISOString().split('T')[0];
+  let effectiveIntent: AdvancedUserIntent = intent;
+  let requestedPeriodLabel = intent.dateRange.label;
+
+  // Normalize/guard custom ranges (swap if inverted; clamp future end; fallback if fully future)
+  if (intent.dateRange.type === 'CUSTOM' && intent.dateRange.customStart && intent.dateRange.customEnd) {
+    let start = intent.dateRange.customStart;
+    let end = intent.dateRange.customEnd;
+
+    if (start > end) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    if (start > today) {
+      // Entirely in the future => show latest available instead
+      context += `\n⚠️ O período solicitado (${requestedPeriodLabel}) está no futuro. Não existem dados ainda.`;
+      context += `\n➡️ Vou mostrar o período mais recente disponível (Últimos 30 dias).\n`;
+      effectiveIntent = {
+        ...intent,
+        dateRange: { type: 'PREDEFINED', predefined: 'LAST_30_DAYS', label: 'Últimos 30 dias' },
+      };
+    } else {
+      if (end > today) {
+        context += `\nℹ️ O período solicitado inclui datas futuras; vou considerar dados até ${today}.\n`;
+        end = today;
+      }
+      effectiveIntent = {
+        ...intent,
+        dateRange: {
+          ...intent.dateRange,
+          customStart: start,
+          customEnd: end,
+          label: intent.dateRange.label,
+        },
+      };
+    }
+  }
+
   // Build filter description
   let filterDesc = '';
-  if (intent.filters.campaignName) {
-    filterDesc += `\n🔍 Filtro de campanha: "${intent.filters.campaignName}"`;
+  if (effectiveIntent.filters.campaignName) {
+    filterDesc += `\n🔍 Filtro de campanha: "${effectiveIntent.filters.campaignName}"`;
   }
-  if (intent.filters.campaignType) {
+  if (effectiveIntent.filters.campaignType) {
     const typeLabels: Record<string, string> = {
       'SEARCH': 'Busca',
       'DISPLAY': 'Display',
@@ -872,23 +918,23 @@ async function buildAdvancedAdsContext(
       'SHOPPING': 'Shopping',
       'PERFORMANCE_MAX': 'Performance Max',
     };
-    filterDesc += `\n🔍 Tipo de campanha: ${typeLabels[intent.filters.campaignType] || intent.filters.campaignType}`;
+    filterDesc += `\n🔍 Tipo de campanha: ${typeLabels[effectiveIntent.filters.campaignType] || effectiveIntent.filters.campaignType}`;
   }
-  if (intent.filters.adGroupName) {
-    filterDesc += `\n🔍 Grupo de anúncios: "${intent.filters.adGroupName}"`;
+  if (effectiveIntent.filters.adGroupName) {
+    filterDesc += `\n🔍 Grupo de anúncios: "${effectiveIntent.filters.adGroupName}"`;
   }
-  
+
   context += filterDesc;
-  
+
   // Always fetch current period metrics
-  const currentMetrics = await fetchMetricsByDateRange(customerId, accessToken, intent.dateRange, intent.filters);
-  
+  const currentMetrics = await fetchMetricsByDateRange(customerId, accessToken, effectiveIntent.dateRange, effectiveIntent.filters);
+
   if (!currentMetrics) {
-    return '\n\n⚠️ Não foi possível obter métricas do Google Ads para o período solicitado. Pode não haver dados disponíveis para este período.';
+    return `\n\n⚠️ Não há dados disponíveis para o período solicitado (${requestedPeriodLabel}).`; 
   }
 
   context += `\n\n═══════════════════════════════════════\n`;
-  context += `📈 VISÃO GERAL (${intent.dateRange.label}):\n`;
+  context += `📈 VISÃO GERAL (${effectiveIntent.dateRange.label}):\n`;
   context += `═══════════════════════════════════════\n`;
   context += `• Investimento: R$ ${currentMetrics.cost}\n`;
   context += `• Conversões: ${currentMetrics.conversions}\n`;
@@ -901,14 +947,19 @@ async function buildAdvancedAdsContext(
   context += `• CPC Médio: R$ ${currentMetrics.avgCpc}\n`;
 
   // Handle comparison
-  if (intent.type === 'COMPARISON' && intent.comparisonDateRange) {
-    const previousMetrics = await fetchMetricsByDateRange(customerId, accessToken, intent.comparisonDateRange, intent.filters);
-    
+  if (effectiveIntent.type === 'COMPARISON' && effectiveIntent.comparisonDateRange) {
+    const previousMetrics = await fetchMetricsByDateRange(
+      customerId,
+      accessToken,
+      effectiveIntent.comparisonDateRange,
+      effectiveIntent.filters
+    );
+
     if (previousMetrics) {
       context += `\n═══════════════════════════════════════\n`;
-      context += `📊 COMPARATIVO: ${intent.dateRange.label} vs ${intent.comparisonDateRange.label}\n`;
+      context += `📊 COMPARATIVO: ${effectiveIntent.dateRange.label} vs ${effectiveIntent.comparisonDateRange.label}\n`;
       context += `═══════════════════════════════════════\n`;
-      context += `| Métrica | ${intent.dateRange.label} | ${intent.comparisonDateRange.label} | Variação |\n`;
+      context += `| Métrica | ${effectiveIntent.dateRange.label} | ${effectiveIntent.comparisonDateRange.label} | Variação |\n`;
       context += `|---------|-------|----------|----------|\n`;
       context += `| Gasto | R$ ${currentMetrics.cost} | R$ ${previousMetrics.cost} | ${calculateVariation(parseFloat(currentMetrics.cost), parseFloat(previousMetrics.cost))} |\n`;
       context += `| Conv. | ${currentMetrics.conversions} | ${previousMetrics.conversions} | ${calculateVariation(parseInt(currentMetrics.conversions), parseInt(previousMetrics.conversions))} |\n`;
@@ -921,11 +972,11 @@ async function buildAdvancedAdsContext(
   }
 
   // Handle monthly report
-  if (intent.type === 'MONTHLY_REPORT') {
-    const monthlyData = await fetchMonthlyMetrics(customerId, accessToken, intent.dateRange);
+  if (effectiveIntent.type === 'MONTHLY_REPORT') {
+    const monthlyData = await fetchMonthlyMetrics(customerId, accessToken, effectiveIntent.dateRange);
     if (monthlyData && monthlyData.length > 0) {
       const monthNames = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      
+
       context += `\n═══════════════════════════════════════\n`;
       context += `📅 MÉTRICAS MENSAIS:\n`;
       context += `═══════════════════════════════════════\n`;
@@ -940,8 +991,8 @@ async function buildAdvancedAdsContext(
   }
 
   // Handle daily report
-  if (intent.type === 'DAILY_REPORT') {
-    const dailyData = await fetchDailyMetrics(customerId, accessToken, intent.dateRange);
+  if (effectiveIntent.type === 'DAILY_REPORT') {
+    const dailyData = await fetchDailyMetrics(customerId, accessToken, effectiveIntent.dateRange);
     if (dailyData && dailyData.length > 0) {
       context += `\n═══════════════════════════════════════\n`;
       context += `📅 MÉTRICAS POR DIA:\n`;
@@ -955,8 +1006,8 @@ async function buildAdvancedAdsContext(
   }
 
   // Handle campaigns
-  if (intent.type === 'CAMPAIGNS' || intent.type === 'OVERVIEW' || intent.type === 'FILTERED') {
-    const campaigns = await fetchCampaignDetails(customerId, accessToken, intent.dateRange, intent.filters);
+  if (effectiveIntent.type === 'CAMPAIGNS' || effectiveIntent.type === 'OVERVIEW' || effectiveIntent.type === 'FILTERED') {
+    const campaigns = await fetchCampaignDetails(customerId, accessToken, effectiveIntent.dateRange, effectiveIntent.filters);
     if (campaigns && campaigns.length > 0) {
       const typeLabels: Record<string, string> = {
         'SEARCH': '🔍 Busca',
@@ -966,7 +1017,7 @@ async function buildAdvancedAdsContext(
         'PERFORMANCE_MAX': '⚡ PMax',
         'UNKNOWN': '❓',
       };
-      
+
       context += `\n═══════════════════════════════════════\n`;
       context += `🎯 PERFORMANCE POR CAMPANHA:\n`;
       context += `═══════════════════════════════════════\n`;
@@ -978,8 +1029,14 @@ async function buildAdvancedAdsContext(
   }
 
   // Handle keywords
-  if (intent.type === 'KEYWORDS') {
-    const keywords = await fetchKeywordPerformance(customerId, accessToken, intent.dateRange, intent.filters, intent.limit);
+  if (effectiveIntent.type === 'KEYWORDS') {
+    const keywords = await fetchKeywordPerformance(
+      customerId,
+      accessToken,
+      effectiveIntent.dateRange,
+      effectiveIntent.filters,
+      effectiveIntent.limit
+    );
     if (keywords && keywords.length > 0) {
       context += `\n═══════════════════════════════════════\n`;
       context += `🔑 TOP PALAVRAS-CHAVE:\n`;
@@ -991,34 +1048,34 @@ async function buildAdvancedAdsContext(
         const qsEmoji = k.qualityScore ? (k.qualityScore >= 7 ? '🟢' : k.qualityScore >= 5 ? '🟡' : '🔴') : '';
         context += `| ${i + 1} | ${k.keyword.substring(0, 20)} | ${k.campaignName.substring(0, 15)} | R$ ${k.cost} | ${k.clicks} | ${k.conversions} | R$ ${k.avgCpc} | ${qs} ${qsEmoji} |\n`;
       });
-      
-      // Add insights
+
       const highQS = keywords.filter(k => k.qualityScore && k.qualityScore >= 7);
       const lowQS = keywords.filter(k => k.qualityScore && k.qualityScore <= 4);
       if (highQS.length > 0 || lowQS.length > 0) {
         context += `\n💡 INSIGHTS:\n`;
-        if (highQS.length > 0) {
-          context += `• 🟢 ${highQS.length} palavras-chave com Quality Score alto (≥7)\n`;
-        }
-        if (lowQS.length > 0) {
-          context += `• 🔴 ${lowQS.length} palavras-chave com Quality Score baixo (≤4) - considere otimizar\n`;
-        }
+        if (highQS.length > 0) context += `• 🟢 ${highQS.length} palavras-chave com Quality Score alto (≥7)\n`;
+        if (lowQS.length > 0) context += `• 🔴 ${lowQS.length} palavras-chave com Quality Score baixo (≤4) - considere otimizar\n`;
       }
     }
   }
 
   // Handle search terms
-  if (intent.type === 'SEARCH_TERMS') {
-    const searchTerms = await fetchSearchTermsReport(customerId, accessToken, intent.dateRange, intent.filters, intent.limit);
+  if (effectiveIntent.type === 'SEARCH_TERMS') {
+    const searchTerms = await fetchSearchTermsReport(
+      customerId,
+      accessToken,
+      effectiveIntent.dateRange,
+      effectiveIntent.filters,
+      effectiveIntent.limit
+    );
     if (searchTerms && searchTerms.length > 0) {
       context += `\n═══════════════════════════════════════\n`;
       context += `🔍 TERMOS DE PESQUISA REAIS:\n`;
       context += `═══════════════════════════════════════\n`;
-      
-      // Separate converting and non-converting
+
       const converting = searchTerms.filter(t => parseInt(t.conversions) > 0);
       const nonConverting = searchTerms.filter(t => parseInt(t.conversions) === 0);
-      
+
       if (converting.length > 0) {
         context += `\n✅ TERMOS QUE CONVERTERAM:\n`;
         context += `| Termo | Campanha | Conv. | Cliques | Gasto |\n`;
@@ -1027,7 +1084,7 @@ async function buildAdvancedAdsContext(
           context += `| ${t.searchTerm.substring(0, 30)} | ${t.campaignName.substring(0, 20)} | ${t.conversions} | ${t.clicks} | R$ ${t.cost} |\n`;
         });
       }
-      
+
       if (nonConverting.length > 0) {
         context += `\n⚠️ TERMOS COM ALTO VOLUME SEM CONVERSÃO (avaliar negativação):\n`;
         const highClickNoConv = nonConverting.filter(t => t.clicks >= 5).slice(0, 10);
@@ -1039,9 +1096,12 @@ async function buildAdvancedAdsContext(
   }
 
   context += `\n═══════════════════════════════════════\n`;
-  context += `📍 PERÍODO DOS DADOS: ${intent.dateRange.label}\n`;
-  if (Object.keys(intent.filters).length > 0) {
-    context += `🔍 FILTROS APLICADOS: ${JSON.stringify(intent.filters)}\n`;
+  if (requestedPeriodLabel !== effectiveIntent.dateRange.label) {
+    context += `📝 PERÍODO SOLICITADO: ${requestedPeriodLabel}\n`;
+  }
+  context += `📍 PERÍODO DOS DADOS: ${effectiveIntent.dateRange.label}\n`;
+  if (Object.keys(effectiveIntent.filters).length > 0) {
+    context += `🔍 FILTROS APLICADOS: ${JSON.stringify(effectiveIntent.filters)}\n`;
   }
   context += `Use esses dados para análises detalhadas.\n`;
 
