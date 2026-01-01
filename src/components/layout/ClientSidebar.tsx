@@ -6,7 +6,8 @@ import {
   LogOut,
   Zap,
   Sun,
-  Moon
+  Moon,
+  FolderOpen
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +29,7 @@ import {
 const menuItems = [
   { title: 'Pauta de Reunião', url: '/portal', icon: FileText },
   { title: 'Performance', url: '/portal/performance', icon: BarChart3 },
+  { title: 'Arquivos', url: '/portal/files', icon: FolderOpen },
   { title: 'Chat com IA', url: '/portal/chat', icon: MessageSquare },
 ];
 
