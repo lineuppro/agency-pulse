@@ -135,76 +135,80 @@ export default function AdminChat() {
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-            {!selectedClientId ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <Bot className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Selecione um cliente
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Escolha um cliente acima para iniciar uma conversa com contexto dos documentos dele.
-                </p>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <Bot className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Como posso ajudar?
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Pergunte sobre campanhas, documentos, estratégias ou qualquer informação do cliente.
-                  {selectedClient?.google_drive_id && (
-                    <span className="block mt-2 text-primary">
-                      💡 Clique no ícone de sincronização para atualizar os documentos do Drive.
-                    </span>
-                  )}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    {message.role === 'assistant' && (
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    </div>
-                    {message.role === 'user' && (
-                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="p-4" ref={scrollRef}>
+                {!selectedClientId ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <Bot className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                      Selecione um cliente
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Escolha um cliente acima para iniciar uma conversa com contexto dos documentos dele.
+                    </p>
                   </div>
-                ))}
-                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-                  <div className="flex gap-3 justify-start">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="bg-muted rounded-lg px-4 py-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <Bot className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                      Como posso ajudar?
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Pergunte sobre campanhas, documentos, estratégias ou qualquer informação do cliente.
+                      {selectedClient?.google_drive_id && (
+                        <span className="block mt-2 text-primary">
+                          💡 Clique no ícone de sincronização para atualizar os documentos do Drive.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex gap-3 ${
+                          message.role === 'user' ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        {message.role === 'assistant' && (
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <Bot className="h-4 w-4 text-primary" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                            message.role === 'user'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        </div>
+                        {message.role === 'user' && (
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+                      <div className="flex gap-3 justify-start">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Bot className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="bg-muted rounded-lg px-4 py-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </ScrollArea>
+            </ScrollArea>
+          </div>
 
           {error && (
             <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm">
