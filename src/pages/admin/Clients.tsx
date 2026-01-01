@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Building2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Building2, Mail, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Badge } from '@/components/ui/badge';
 
 interface Client {
   id: string;
@@ -16,30 +18,46 @@ interface Client {
   google_ads_id: string | null;
   google_drive_id: string | null;
   created_at: string;
+  user_email?: string | null;
 }
 
 export default function AdminClients() {
+  const { session } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     logo_url: '',
     google_ads_id: '',
     google_drive_id: '',
+    client_email: '',
+    client_full_name: '',
   });
   const { toast } = useToast();
 
   const fetchClients = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: clientsData, error } = await supabase
         .from('clients')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setClients(data || []);
+
+      // Fetch linked user emails
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('client_id, email');
+
+      const clientsWithEmail = (clientsData || []).map(client => ({
+        ...client,
+        user_email: profiles?.find(p => p.client_id === client.id)?.email || null,
+      }));
+
+      setClients(clientsWithEmail);
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast({
@@ -58,8 +76,11 @@ export default function AdminClients() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreatingUser(true);
     
     try {
+      let clientId = editingClient?.id;
+
       if (editingClient) {
         const { error } = await supabase
           .from('clients')
@@ -74,30 +95,60 @@ export default function AdminClients() {
         if (error) throw error;
         toast({ title: 'Cliente atualizado com sucesso!' });
       } else {
-        const { error } = await supabase
+        const { data: newClient, error } = await supabase
           .from('clients')
           .insert({
             name: formData.name,
             logo_url: formData.logo_url || null,
             google_ads_id: formData.google_ads_id || null,
             google_drive_id: formData.google_drive_id || null,
-          });
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+        clientId = newClient.id;
         toast({ title: 'Cliente criado com sucesso!' });
+      }
+
+      // Create user if email is provided
+      if (formData.client_email && clientId && session?.access_token) {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-client-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              clientId,
+              email: formData.client_email,
+              fullName: formData.client_full_name || null,
+            }),
+          }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Erro ao criar usuário');
+        }
+        toast({ title: data.message || 'Usuário vinculado com sucesso!' });
       }
 
       setIsDialogOpen(false);
       setEditingClient(null);
-      setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '' });
+      setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '', client_email: '', client_full_name: '' });
       fetchClients();
     } catch (error) {
       console.error('Error saving client:', error);
       toast({
-        title: 'Erro ao salvar cliente',
-        description: 'Não foi possível salvar o cliente.',
+        title: 'Erro ao salvar',
+        description: error instanceof Error ? error.message : 'Não foi possível salvar.',
         variant: 'destructive',
       });
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -108,6 +159,8 @@ export default function AdminClients() {
       logo_url: client.logo_url || '',
       google_ads_id: client.google_ads_id || '',
       google_drive_id: client.google_drive_id || '',
+      client_email: '',
+      client_full_name: '',
     });
     setIsDialogOpen(true);
   };
@@ -130,7 +183,7 @@ export default function AdminClients() {
 
   const handleOpenDialog = () => {
     setEditingClient(null);
-    setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '' });
+    setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '', client_email: '', client_full_name: '' });
     setIsDialogOpen(true);
   };
 
@@ -199,12 +252,47 @@ export default function AdminClients() {
                   placeholder="Ex: 1AbCdEfGhIjKlMnOpQrStUvWxYz"
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Acesso ao Portal
+                </h4>
+                <div className="space-y-2">
+                  <Label htmlFor="client_email">Email do Cliente</Label>
+                  <Input
+                    id="client_email"
+                    type="email"
+                    value={formData.client_email}
+                    onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
+                    placeholder="cliente@empresa.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {editingClient ? 'Adicione um email para vincular um novo usuário' : 'O usuário receberá acesso ao portal'}
+                  </p>
+                </div>
+                <div className="space-y-2 mt-2">
+                  <Label htmlFor="client_full_name">Nome Completo</Label>
+                  <Input
+                    id="client_full_name"
+                    value={formData.client_full_name}
+                    onChange={(e) => setFormData({ ...formData, client_full_name: e.target.value })}
+                    placeholder="João da Silva"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">
-                  {editingClient ? 'Salvar' : 'Criar'}
+                <Button type="submit" disabled={creatingUser}>
+                  {creatingUser ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    editingClient ? 'Salvar' : 'Criar'
+                  )}
                 </Button>
               </div>
             </form>
@@ -277,6 +365,16 @@ export default function AdminClients() {
                     <span className="font-mono text-foreground truncate max-w-[120px]">
                       {client.google_drive_id || '-'}
                     </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Usuário:</span>
+                    {client.user_email ? (
+                      <Badge variant="secondary" className="text-xs truncate max-w-[140px]">
+                        {client.user_email}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Não vinculado</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4 pt-4 border-t border-border">

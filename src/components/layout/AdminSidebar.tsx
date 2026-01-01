@@ -9,7 +9,9 @@ import {
   Zap,
   Sun,
   Moon,
-  BarChart3
+  BarChart3,
+  FolderOpen,
+  FileText
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +35,8 @@ const menuItems = [
   { title: 'Clientes', url: '/admin/clients', icon: Users },
   { title: 'Tarefas', url: '/admin/tasks', icon: CheckSquare },
   { title: 'Performance', url: '/admin/performance', icon: BarChart3 },
+  { title: 'Arquivos', url: '/admin/files', icon: FolderOpen },
+  { title: 'Pauta de Reunião', url: '/admin/agenda', icon: FileText },
   { title: 'Chat IA', url: '/admin/chat', icon: MessageSquare },
   { title: 'Configurações', url: '/admin/settings', icon: Settings },
 ];

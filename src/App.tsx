@@ -23,11 +23,14 @@ import AdminTasks from "./pages/admin/Tasks";
 import AdminPerformance from "./pages/admin/Performance";
 import AdminChat from "./pages/admin/Chat";
 import AdminSettings from "./pages/admin/Settings";
+import AdminFiles from "./pages/admin/Files";
+import AdminMeetingAgenda from "./pages/admin/MeetingAgenda";
 
 // Client Portal Pages
 import MeetingAgenda from "./pages/portal/MeetingAgenda";
 import Performance from "./pages/portal/Performance";
 import Chat from "./pages/portal/Chat";
+import PortalFiles from "./pages/portal/Files";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +60,8 @@ const App = () => (
                 <Route path="clients" element={<AdminClients />} />
                 <Route path="tasks" element={<AdminTasks />} />
                 <Route path="performance" element={<AdminPerformance />} />
+                <Route path="files" element={<AdminFiles />} />
+                <Route path="agenda" element={<AdminMeetingAgenda />} />
                 <Route path="chat" element={<AdminChat />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
@@ -72,6 +77,7 @@ const App = () => (
               >
                 <Route index element={<MeetingAgenda />} />
                 <Route path="performance" element={<Performance />} />
+                <Route path="files" element={<PortalFiles />} />
                 <Route path="chat" element={<Chat />} />
               </Route>
 
