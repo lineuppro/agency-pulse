@@ -2,3 +2,12 @@ project_id = "vsqlwyabgfccszqycmto"
 
 [functions.google-ads-metrics]
 verify_jwt = false
+
+[functions.chat-rag]
+verify_jwt = false
+
+[functions.google-drive-files]
+verify_jwt = false
+
+[functions.sync-drive-documents]
+verify_jwt = false

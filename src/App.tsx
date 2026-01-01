@@ -21,7 +21,7 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import AdminClients from "./pages/admin/Clients";
 import AdminTasks from "./pages/admin/Tasks";
 import AdminPerformance from "./pages/admin/Performance";
-import AdminChats from "./pages/admin/Chats";
+import AdminChat from "./pages/admin/Chat";
 import AdminSettings from "./pages/admin/Settings";
 
 // Client Portal Pages
@@ -57,7 +57,7 @@ const App = () => (
                 <Route path="clients" element={<AdminClients />} />
                 <Route path="tasks" element={<AdminTasks />} />
                 <Route path="performance" element={<AdminPerformance />} />
-                <Route path="chats" element={<AdminChats />} />
+                <Route path="chat" element={<AdminChat />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 

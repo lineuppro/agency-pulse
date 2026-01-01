@@ -1,46 +1,28 @@
-import { useState } from 'react';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Send, Bot, User, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { useChatRAG } from '@/hooks/useChatRAG';
 
 export default function Chat() {
   const { clientId } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, isLoading, error, sendMessage, clearMessages } = useChatRAG(clientId);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = async () => {
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = () => {
     if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    sendMessage(input);
     setInput('');
-    setIsLoading(true);
-
-    // AI chat will be implemented in Phase 4
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Olá! Sou o assistente IA da sua agência. A integração completa com Lovable AI está sendo configurada. Em breve poderei responder suas perguntas sobre performance, documentos e estratégias.',
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 1000);
   };
 
   if (!clientId) {
@@ -58,11 +40,19 @@ export default function Chat() {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col animate-fade-in">
-      <div className="mb-4">
-        <h1 className="text-3xl font-bold text-foreground">Chat com IA</h1>
-        <p className="text-muted-foreground mt-1">
-          Converse com o assistente inteligente da sua agência
-        </p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Chat com IA</h1>
+          <p className="text-muted-foreground mt-1">
+            Converse com o assistente inteligente da sua agência
+          </p>
+        </div>
+        {messages.length > 0 && (
+          <Button variant="outline" size="sm" onClick={clearMessages}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpar
+          </Button>
+        )}
       </div>
 
       <Card className="flex-1 flex flex-col border-border/50 overflow-hidden">
@@ -73,7 +63,7 @@ export default function Chat() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <Bot className="h-12 w-12 text-muted-foreground mb-4" />
@@ -114,7 +104,7 @@ export default function Chat() {
                     )}
                   </div>
                 ))}
-                {isLoading && (
+                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                   <div className="flex gap-3 justify-start">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                       <Bot className="h-4 w-4 text-primary" />
@@ -127,6 +117,12 @@ export default function Chat() {
               </div>
             )}
           </ScrollArea>
+
+          {error && (
+            <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm">
+              {error}
+            </div>
+          )}
 
           <div className="p-4 border-t border-border">
             <form
