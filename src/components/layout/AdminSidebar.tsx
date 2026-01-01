@@ -33,7 +33,7 @@ const menuItems = [
   { title: 'Clientes', url: '/admin/clients', icon: Users },
   { title: 'Tarefas', url: '/admin/tasks', icon: CheckSquare },
   { title: 'Performance', url: '/admin/performance', icon: BarChart3 },
-  { title: 'Conversas', url: '/admin/chats', icon: MessageSquare },
+  { title: 'Chat IA', url: '/admin/chat', icon: MessageSquare },
   { title: 'Configurações', url: '/admin/settings', icon: Settings },
 ];
 
