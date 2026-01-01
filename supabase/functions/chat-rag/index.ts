@@ -6,6 +6,130 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Function to refresh Google access token
+async function getGoogleAccessToken(): Promise<string | null> {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+  const refreshToken = Deno.env.get('GOOGLE_REFRESH_TOKEN');
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    console.log('Google OAuth credentials not configured');
+    return null;
+  }
+
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to refresh Google token');
+      return null;
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Error refreshing Google token:', error);
+    return null;
+  }
+}
+
+// Function to fetch Google Ads metrics
+async function fetchGoogleAdsMetrics(customerId: string, accessToken: string): Promise<any | null> {
+  const developerToken = Deno.env.get('GOOGLE_DEVELOPER_TOKEN');
+  if (!developerToken) {
+    console.log('GOOGLE_DEVELOPER_TOKEN not configured');
+    return null;
+  }
+
+  const cleanCustomerId = customerId.replace(/-/g, '');
+  
+  const query = `
+    SELECT
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value,
+      metrics.clicks,
+      metrics.impressions,
+      metrics.ctr,
+      metrics.average_cpc
+    FROM customer
+    WHERE segments.date DURING LAST_30_DAYS
+  `;
+
+  try {
+    const response = await fetch(
+      `https://googleads.googleapis.com/v22/customers/${cleanCustomerId}/googleAds:searchStream`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'developer-token': developerToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Google Ads API error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data && data[0]?.results?.[0]?.metrics) {
+      const metrics = data[0].results[0].metrics;
+      const cost = parseInt(metrics.costMicros || '0') / 1000000;
+      const conversions = metrics.conversions || 0;
+      const conversionValue = metrics.conversionsValue || 0;
+      const clicks = parseInt(metrics.clicks || '0');
+      const impressions = parseInt(metrics.impressions || '0');
+      const ctr = (metrics.ctr || 0) * 100;
+      const avgCpc = (metrics.averageCpc || 0) / 1000000;
+      const roas = cost > 0 ? conversionValue / cost : 0;
+      const cpa = conversions > 0 ? cost / conversions : 0;
+
+      return {
+        cost: cost.toFixed(2),
+        conversions: conversions.toFixed(0),
+        conversionValue: conversionValue.toFixed(2),
+        clicks,
+        impressions,
+        ctr: ctr.toFixed(2),
+        avgCpc: avgCpc.toFixed(2),
+        roas: roas.toFixed(2),
+        cpa: cpa.toFixed(2),
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching Google Ads metrics:', error);
+    return null;
+  }
+}
+
+// Check if message is asking about Google Ads / performance
+function isAskingAboutAds(message: string): boolean {
+  const keywords = [
+    'google ads', 'campanha', 'campanhas', 'performance', 'métricas', 'metricas',
+    'roas', 'cpa', 'conversões', 'conversoes', 'cliques', 'impressões', 'impressoes',
+    'ctr', 'cpc', 'custo', 'gasto', 'resultado', 'resultados', 'anúncios', 'anuncios',
+    'ads', 'tráfego pago', 'trafego pago', 'mídia paga', 'midia paga'
+  ];
+  const lowerMessage = message.toLowerCase();
+  return keywords.some(keyword => lowerMessage.includes(keyword));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -50,7 +174,7 @@ serve(async (req) => {
 
     console.log('Authenticated user:', user.id);
 
-    const { messages, clientId, sessionId } = await req.json();
+    const { messages, clientId } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Messages array is required' }), {
@@ -91,7 +215,7 @@ serve(async (req) => {
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
     const query = lastUserMessage?.content || '';
 
-    // Search for relevant documents using text search (simpler than embeddings for now)
+    // Search for relevant documents
     let contextDocs: any[] = [];
     if (targetClientId && query) {
       const { data: docs, error: docsError } = await supabaseAdmin
@@ -105,6 +229,43 @@ serve(async (req) => {
       } else {
         contextDocs = docs || [];
         console.log('Found', contextDocs.length, 'documents for context');
+      }
+    }
+
+    // Fetch Google Ads metrics if asking about ads/performance
+    let adsMetricsContext = '';
+    if (targetClientId && isAskingAboutAds(query)) {
+      console.log('User is asking about ads, fetching Google Ads metrics...');
+      
+      // Get client's google_ads_id
+      const { data: client } = await supabaseAdmin
+        .from('clients')
+        .select('name, google_ads_id')
+        .eq('id', targetClientId)
+        .single();
+
+      if (client?.google_ads_id) {
+        const accessToken = await getGoogleAccessToken();
+        if (accessToken) {
+          const metrics = await fetchGoogleAdsMetrics(client.google_ads_id, accessToken);
+          if (metrics) {
+            console.log('Google Ads metrics fetched successfully');
+            adsMetricsContext = `
+
+MÉTRICAS ATUAIS DO GOOGLE ADS (últimos 30 dias):
+- Investimento total: R$ ${metrics.cost}
+- Conversões: ${metrics.conversions}
+- Valor das conversões: R$ ${metrics.conversionValue}
+- ROAS: ${metrics.roas}x
+- CPA médio: R$ ${metrics.cpa}
+- Cliques: ${metrics.clicks}
+- Impressões: ${metrics.impressions}
+- CTR: ${metrics.ctr}%
+- CPC médio: R$ ${metrics.avgCpc}
+
+Use esses dados para responder perguntas sobre a performance atual das campanhas.`;
+          }
+        }
       }
     }
 
@@ -133,11 +294,13 @@ serve(async (req) => {
     const systemPrompt = `Você é o assistente IA da AgencyOS, uma plataforma de gestão para agências de marketing.
 Seu papel é ajudar ${isAdmin ? 'administradores' : 'clientes'} com informações sobre campanhas, performance, documentos e estratégias.
 ${clientInfo}
+${adsMetricsContext}
 ${documentContext}
 
 Diretrizes:
 - Seja conciso e direto nas respostas
-- Use dados e informações dos documentos quando disponíveis
+- Use dados e informações dos documentos e métricas quando disponíveis
+- Quando falar de métricas do Google Ads, use os dados reais fornecidos acima
 - Se não tiver informação suficiente, diga claramente
 - Mantenha um tom profissional mas amigável
 - Responda sempre em português brasileiro`;
