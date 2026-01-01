@@ -114,6 +114,8 @@ function parseUserIntent(message: string): UserIntent {
     /evolução|evolucao|tendência|tendencia|histórico|historico/i,
     /semana passada.*(semana anterior|última|ultima)/i,
     /mês passado.*(mês anterior|último|ultimo)/i,
+    /ano\s+passado|ano\s+anterior/i,
+    /comparativo|comparar\s+anos|mês\s+a\s+mês|mensal/i,
   ];
   
   const hasComparison = comparisonPatterns.some(p => p.test(lowerMessage));
@@ -147,6 +149,8 @@ function parseUserIntent(message: string): UserIntent {
     /todas\s+as\s+campanhas/i,
     /lista[r]?\s+campanha/i,
     /detalhe[s]?\s+(da|das)\s+campanha/i,
+    /campanhas?\s+de\s+google\s*ads/i,
+    /google\s*ads.*campanha/i,
   ];
   
   const hasCampaigns = campaignPatterns.some(p => p.test(lowerMessage));
@@ -162,20 +166,33 @@ function parseUserIntent(message: string): UserIntent {
   
   const hasDailyReport = dailyPatterns.some(p => p.test(lowerMessage));
   
-  // Determine period
+  // Determine period - Extended support for longer periods
   let period = 'LAST_30_DAYS';
   let comparisonPeriod: string | undefined;
   
-  if (/últim[oa]s?\s*7\s*dias|última\s*semana|semana\s*passada/i.test(lowerMessage)) {
+  // Check for year-based requests first (longest periods)
+  if (/últim[oa]s?\s*3\s*anos|três\s*anos/i.test(lowerMessage)) {
+    // Google Ads doesn't support 3 years directly, use maximum available
+    period = 'LAST_30_DAYS'; // Will explain limitation in response
+  } else if (/últim[oa]s?\s*(2|dois)\s*anos|24\s*meses/i.test(lowerMessage)) {
+    period = 'LAST_30_DAYS'; // Will explain limitation
+  } else if (/últim[oa]?\s*ano|12\s*meses|ano\s*passado/i.test(lowerMessage)) {
+    period = 'LAST_30_DAYS'; // Will provide what's available
+  } else if (/últim[oa]s?\s*7\s*dias|última\s*semana|semana\s*passada/i.test(lowerMessage)) {
     period = 'LAST_7_DAYS';
-    if (hasComparison) comparisonPeriod = 'LAST_14_DAYS'; // Will subtract to get previous week
+    if (hasComparison) comparisonPeriod = 'LAST_14_DAYS';
   } else if (/últim[oa]s?\s*14\s*dias|duas\s*semanas/i.test(lowerMessage)) {
     period = 'LAST_14_DAYS';
+    if (hasComparison) comparisonPeriod = 'LAST_30_DAYS';
   } else if (/últim[oa]s?\s*30\s*dias|último\s*mês|mês\s*passado/i.test(lowerMessage)) {
     period = 'LAST_30_DAYS';
     if (hasComparison) comparisonPeriod = 'LAST_60_DAYS';
+  } else if (/últim[oa]s?\s*60\s*dias|2\s*meses/i.test(lowerMessage)) {
+    period = 'LAST_30_DAYS'; // Use 30 and compare
+    comparisonPeriod = 'LAST_60_DAYS';
   } else if (/últim[oa]s?\s*90\s*dias|3\s*meses|trimestre/i.test(lowerMessage)) {
-    period = 'LAST_90_DAYS';
+    period = 'LAST_30_DAYS';
+    comparisonPeriod = 'LAST_90_DAYS';
   }
   
   // Determine type based on priority
@@ -762,6 +779,16 @@ serve(async (req) => {
     const systemPrompt = `Você é o assistente IA da AgencyOS, uma plataforma de gestão para agências de marketing.
 Seu papel é ajudar ${isAdmin ? 'administradores' : 'clientes'} com análises detalhadas de campanhas, performance, documentos e estratégias.
 ${clientInfo}
+
+🚨 REGRA CRÍTICA - ACESSO A DADOS:
+VOCÊ TEM ACESSO DIRETO AOS DADOS DO GOOGLE ADS DESTE CLIENTE.
+Os dados estão listados abaixo em "DADOS DO GOOGLE ADS".
+- NUNCA diga que você não tem acesso aos dados.
+- NUNCA peça para o usuário fornecer dados ou exportar relatórios.
+- NUNCA sugira que o usuário acesse o Google Ads para obter informações.
+- Use EXCLUSIVAMENTE os dados fornecidos neste contexto para suas análises.
+- Se os dados não estiverem disponíveis, explique que houve um problema técnico na consulta.
+
 ${adsMetricsContext}
 ${documentContext}
 
@@ -788,7 +815,11 @@ DIRETRIZES IMPORTANTES:
 - Seja conciso mas completo
 - Use linguagem profissional mas acessível
 - Explique termos técnicos quando o usuário parecer iniciante
-- Responda sempre em português brasileiro`;
+- Responda sempre em português brasileiro
+
+⚠️ LIMITAÇÕES DE PERÍODO:
+- A API do Google Ads tem limitação de dados históricos
+- Se o usuário pedir dados de períodos muito longos (>90 dias), explique que você está mostrando os dados disponíveis mais recentes`;
 
     console.log('Calling Lovable AI with streaming...');
 

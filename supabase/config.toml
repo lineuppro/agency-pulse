@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sync-drive-documents]
 verify_jwt = false
+
+[functions.google-ads-detailed]
+verify_jwt = false
