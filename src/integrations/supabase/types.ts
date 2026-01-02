@@ -237,6 +237,7 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          meeting_agenda_id: string | null
           status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
@@ -249,6 +250,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          meeting_agenda_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at?: string
@@ -261,6 +263,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          meeting_agenda_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
@@ -271,6 +274,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_meeting_agenda_id_fkey"
+            columns: ["meeting_agenda_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_agendas"
             referencedColumns: ["id"]
           },
         ]
