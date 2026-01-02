@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, GripVertical, Calendar, Tag, User } from 'lucide-react';
+import { Plus, GripVertical, Calendar, Tag, User, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,8 +24,10 @@ interface Task {
   category: TaskCategory;
   due_date: string | null;
   assigned_to: string | null;
+  meeting_agenda_id: string | null;
   created_at: string;
   clients?: { name: string } | null;
+  meeting_agendas?: { title: string; meeting_date: string } | null;
 }
 
 interface Client {
@@ -83,7 +85,7 @@ export default function AdminTasks() {
       const [tasksRes, clientsRes, usersRes] = await Promise.all([
         supabase
           .from('tasks')
-          .select('*, clients(name)')
+          .select('*, clients(name), meeting_agendas(title, meeting_date)')
           .order('created_at', { ascending: false }),
         supabase.from('clients').select('id, name').order('name'),
         supabase.from('profiles').select('user_id, full_name, email, client_id'),
@@ -387,6 +389,12 @@ export default function AdminTasks() {
                             <Badge variant="outline" className="text-xs">
                               <Calendar className="h-3 w-3 mr-1" />
                               {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                            </Badge>
+                          )}
+                          {task.meeting_agendas && (
+                            <Badge variant="secondary" className="text-xs">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Reunião
                             </Badge>
                           )}
                         </div>
