@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, GripVertical, Calendar, Tag } from 'lucide-react';
+import { Plus, GripVertical, Calendar, Tag, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed';
 type TaskCategory = 'ads' | 'dev' | 'automation' | 'creative';
@@ -22,6 +23,7 @@ interface Task {
   status: TaskStatus;
   category: TaskCategory;
   due_date: string | null;
+  assigned_to: string | null;
   created_at: string;
   clients?: { name: string } | null;
 }
@@ -29,6 +31,13 @@ interface Task {
 interface Client {
   id: string;
   name: string;
+}
+
+interface UserProfile {
+  user_id: string;
+  full_name: string | null;
+  email: string;
+  client_id: string | null;
 }
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -52,8 +61,10 @@ const categoryColors: Record<TaskCategory, string> = {
 };
 
 export default function AdminTasks() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
@@ -63,24 +74,28 @@ export default function AdminTasks() {
     description: '',
     category: 'ads' as TaskCategory,
     due_date: '',
+    assigned_to: '',
   });
   const { toast } = useToast();
 
   const fetchData = async () => {
     try {
-      const [tasksRes, clientsRes] = await Promise.all([
+      const [tasksRes, clientsRes, usersRes] = await Promise.all([
         supabase
           .from('tasks')
           .select('*, clients(name)')
           .order('created_at', { ascending: false }),
         supabase.from('clients').select('id, name').order('name'),
+        supabase.from('profiles').select('user_id, full_name, email, client_id'),
       ]);
 
       if (tasksRes.error) throw tasksRes.error;
       if (clientsRes.error) throw clientsRes.error;
+      if (usersRes.error) throw usersRes.error;
 
       setTasks(tasksRes.data || []);
       setClients(clientsRes.data || []);
+      setUsers(usersRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -96,6 +111,26 @@ export default function AdminTasks() {
     fetchData();
   }, []);
 
+  // Get available users for a specific client (users linked to that client + current admin)
+  const getAvailableUsers = (clientId: string) => {
+    const clientUsers = users.filter(u => u.client_id === clientId);
+    const adminUser = users.find(u => u.user_id === user?.id);
+    
+    // Combine and deduplicate
+    const allUsers = [...clientUsers];
+    if (adminUser && !allUsers.find(u => u.user_id === adminUser.user_id)) {
+      allUsers.unshift(adminUser);
+    }
+    
+    return allUsers;
+  };
+
+  const getUserName = (userId: string | null) => {
+    if (!userId) return null;
+    const userProfile = users.find(u => u.user_id === userId);
+    return userProfile?.full_name || userProfile?.email?.split('@')[0] || null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -106,13 +141,14 @@ export default function AdminTasks() {
         description: formData.description || null,
         category: formData.category,
         due_date: formData.due_date || null,
+        assigned_to: formData.assigned_to || null,
       });
 
       if (error) throw error;
       
       toast({ title: 'Tarefa criada com sucesso!' });
       setIsDialogOpen(false);
-      setFormData({ client_id: '', title: '', description: '', category: 'ads', due_date: '' });
+      setFormData({ client_id: '', title: '', description: '', category: 'ads', due_date: '', assigned_to: '' });
       fetchData();
     } catch (error) {
       console.error('Error creating task:', error);
@@ -158,6 +194,8 @@ export default function AdminTasks() {
   const getTasksByStatus = (status: TaskStatus) => 
     filteredTasks.filter(t => t.status === status);
 
+  const availableUsersForForm = formData.client_id ? getAvailableUsers(formData.client_id) : [];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -200,7 +238,7 @@ export default function AdminTasks() {
                 <Label htmlFor="client">Cliente *</Label>
                 <Select 
                   value={formData.client_id} 
-                  onValueChange={(v) => setFormData({ ...formData, client_id: v })}
+                  onValueChange={(v) => setFormData({ ...formData, client_id: v, assigned_to: '' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um cliente" />
@@ -262,6 +300,26 @@ export default function AdminTasks() {
                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assigned_to">Responsável</Label>
+                <Select 
+                  value={formData.assigned_to} 
+                  onValueChange={(v) => setFormData({ ...formData, assigned_to: v })}
+                  disabled={!formData.client_id}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.client_id ? "Selecione um responsável" : "Selecione um cliente primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableUsersForForm.map((userProfile) => (
+                      <SelectItem key={userProfile.user_id} value={userProfile.user_id}>
+                        {userProfile.full_name || userProfile.email.split('@')[0]}
+                        {userProfile.user_id === user?.id && ' (você)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -332,6 +390,12 @@ export default function AdminTasks() {
                             </Badge>
                           )}
                         </div>
+                        {task.assigned_to && (
+                          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                            <User className="h-3 w-3" />
+                            <span>{getUserName(task.assigned_to)}</span>
+                          </div>
+                        )}
                         <div className="mt-3 pt-3 border-t border-border">
                           <Select 
                             value={task.status} 
