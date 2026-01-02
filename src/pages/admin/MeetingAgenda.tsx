@@ -313,7 +313,7 @@ export default function AdminMeetingAgenda() {
 
       {/* Dialog for create/view/edit agenda */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) { resetForm(); } setIsDialogOpen(open); }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader className="shrink-0">
             <DialogTitle>
               {viewingAgenda ? 'Detalhes da Pauta' : 'Nova Pauta de Reunião'}
@@ -323,8 +323,7 @@ export default function AdminMeetingAgenda() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-6 py-2">
+          <div className="space-y-6 py-2">
               {/* Date and Title */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -415,51 +414,46 @@ export default function AdminMeetingAgenda() {
                 )}
 
                 {!viewingAgenda && (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        value={newTask.title}
-                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                        placeholder="Nova tarefa..."
-                        className="flex-1"
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
-                      />
-                      <Select
-                        value={newTask.category}
-                        onValueChange={(v) => setNewTask({ ...newTask, category: v as TaskCategory })}
-                      >
-                        <SelectTrigger className="w-[130px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(categoryLabels).map(([key, label]) => (
-                            <SelectItem key={key} value={key}>{label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex gap-2">
-                      <Select
-                        value={newTask.assigned_to || "unassigned"}
-                        onValueChange={(v) => setNewTask({ ...newTask, assigned_to: v === "unassigned" ? undefined : v })}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Responsável (opcional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Sem responsável</SelectItem>
-                          {clientUsers?.map((user) => (
-                            <SelectItem key={user.user_id} value={user.user_id}>
-                              {user.full_name || user.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button type="button" variant="secondary" onClick={handleAddTask}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Adicionar
-                      </Button>
-                    </div>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      value={newTask.title}
+                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                      placeholder="Nova tarefa..."
+                      className="flex-1 min-w-0"
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
+                    />
+                    <Select
+                      value={newTask.assigned_to || "unassigned"}
+                      onValueChange={(v) => setNewTask({ ...newTask, assigned_to: v === "unassigned" ? undefined : v })}
+                    >
+                      <SelectTrigger className="w-[160px] shrink-0">
+                        <SelectValue placeholder="Responsável" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Sem responsável</SelectItem>
+                        {clientUsers?.map((user) => (
+                          <SelectItem key={user.user_id} value={user.user_id}>
+                            {user.full_name || user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={newTask.category}
+                      onValueChange={(v) => setNewTask({ ...newTask, category: v as TaskCategory })}
+                    >
+                      <SelectTrigger className="w-[140px] shrink-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(categoryLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="secondary" size="icon" className="shrink-0" onClick={handleAddTask}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
                 
@@ -502,7 +496,6 @@ export default function AdminMeetingAgenda() {
                 />
               </div>
             </div>
-          </ScrollArea>
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-4 border-t">
