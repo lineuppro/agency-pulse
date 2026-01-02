@@ -313,8 +313,8 @@ export default function AdminMeetingAgenda() {
 
       {/* Dialog for create/view/edit agenda */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) { resetForm(); } setIsDialogOpen(open); }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               {viewingAgenda ? 'Detalhes da Pauta' : 'Nova Pauta de Reunião'}
             </DialogTitle>
@@ -323,8 +323,8 @@ export default function AdminMeetingAgenda() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-6 pb-4">
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-6 py-2">
               {/* Date and Title */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -383,54 +383,83 @@ export default function AdminMeetingAgenda() {
                 
                 {formTasks.length > 0 && (
                   <div className="space-y-2">
-                    {formTasks.map((task, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/50">
-                        <Badge className={cn("shrink-0", categoryColors[task.category])}>
-                          {categoryLabels[task.category]}
-                        </Badge>
-                        <span className="flex-1 text-sm truncate">{task.title}</span>
-                        {task.id ? (
-                          <Badge variant="outline" className="text-xs">Existente</Badge>
-                        ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleRemoveTask(index)}
-                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                    {formTasks.map((task, index) => {
+                      const assignedUser = clientUsers?.find(u => u.user_id === task.assigned_to);
+                      return (
+                        <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/50">
+                          <Badge className={cn("shrink-0", categoryColors[task.category])}>
+                            {categoryLabels[task.category]}
+                          </Badge>
+                          <span className="flex-1 text-sm truncate">{task.title}</span>
+                          {assignedUser && (
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {assignedUser.full_name || assignedUser.email}
+                            </Badge>
+                          )}
+                          {task.id ? (
+                            <Badge variant="secondary" className="text-xs">Existente</Badge>
+                          ) : (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleRemoveTask(index)}
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
                 {!viewingAgenda && (
-                  <div className="flex gap-2">
-                    <Input
-                      value={newTask.title}
-                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                      placeholder="Nova tarefa..."
-                      className="flex-1"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
-                    />
-                    <Select
-                      value={newTask.category}
-                      onValueChange={(v) => setNewTask({ ...newTask, category: v as TaskCategory })}
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(categoryLabels).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" variant="secondary" size="icon" onClick={handleAddTask}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={newTask.title}
+                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                        placeholder="Nova tarefa..."
+                        className="flex-1"
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
+                      />
+                      <Select
+                        value={newTask.category}
+                        onValueChange={(v) => setNewTask({ ...newTask, category: v as TaskCategory })}
+                      >
+                        <SelectTrigger className="w-[130px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(categoryLabels).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Select
+                        value={newTask.assigned_to || "unassigned"}
+                        onValueChange={(v) => setNewTask({ ...newTask, assigned_to: v === "unassigned" ? undefined : v })}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Responsável (opcional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Sem responsável</SelectItem>
+                          {clientUsers?.map((user) => (
+                            <SelectItem key={user.user_id} value={user.user_id}>
+                              {user.full_name || user.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="secondary" onClick={handleAddTask}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar
+                      </Button>
+                    </div>
                   </div>
                 )}
                 
