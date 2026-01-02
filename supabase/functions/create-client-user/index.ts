@@ -163,14 +163,20 @@ serve(async (req) => {
       console.error("[create-client-user] Error adding role:", roleError);
     }
 
-    // Send password reset email so user can set their own password
-    const { error: resetError } = await supabase.auth.admin.generateLink({
-      type: "recovery",
-      email: email,
+    // Send invite email so user can set their own password
+    const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${req.headers.get('origin') || SUPABASE_URL}/auth`,
     });
 
-    if (resetError) {
-      console.error("[create-client-user] Error generating reset link:", resetError);
+    if (inviteError) {
+      console.error("[create-client-user] Error sending invite:", inviteError);
+      // If invite fails, try password reset as fallback
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${req.headers.get('origin') || SUPABASE_URL}/auth`,
+      });
+      if (resetError) {
+        console.error("[create-client-user] Error sending reset email:", resetError);
+      }
     }
 
     console.log(`[create-client-user] Successfully created user and linked to client`);
@@ -179,7 +185,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         userId: newUser.user.id,
-        message: "Usuário criado com sucesso. Um email de configuração de senha será enviado." 
+        message: "Usuário criado com sucesso. Um email de configuração de senha foi enviado." 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
