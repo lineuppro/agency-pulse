@@ -146,6 +146,50 @@ export type Database = {
           },
         ]
       }
+      meeting_agendas: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          created_by: string
+          generated_summary: string | null
+          id: string
+          meeting_date: string | null
+          notes: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          created_by: string
+          generated_summary?: string | null
+          id?: string
+          meeting_date?: string | null
+          notes?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          created_by?: string
+          generated_summary?: string | null
+          id?: string
+          meeting_date?: string | null
+          notes?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_agendas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           client_id: string | null
@@ -186,6 +230,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          assigned_to: string | null
           category: Database["public"]["Enums"]["task_category"]
           client_id: string
           created_at: string
@@ -197,6 +242,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           category: Database["public"]["Enums"]["task_category"]
           client_id: string
           created_at?: string
@@ -208,6 +254,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           category?: Database["public"]["Enums"]["task_category"]
           client_id?: string
           created_at?: string

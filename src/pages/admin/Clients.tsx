@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Building2, Mail, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 
 interface Client {
@@ -22,19 +21,15 @@ interface Client {
 }
 
 export default function AdminClients() {
-  const { session } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [creatingUser, setCreatingUser] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     logo_url: '',
     google_ads_id: '',
     google_drive_id: '',
-    client_email: '',
-    client_full_name: '',
   });
   const { toast } = useToast();
 
@@ -76,7 +71,6 @@ export default function AdminClients() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreatingUser(true);
     
     try {
       let clientId = editingClient?.id;
@@ -111,34 +105,9 @@ export default function AdminClients() {
         toast({ title: 'Cliente criado com sucesso!' });
       }
 
-      // Create user if email is provided
-      if (formData.client_email && clientId && session?.access_token) {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-client-user`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              clientId,
-              email: formData.client_email,
-              fullName: formData.client_full_name || null,
-            }),
-          }
-        );
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Erro ao criar usuário');
-        }
-        toast({ title: data.message || 'Usuário vinculado com sucesso!' });
-      }
-
       setIsDialogOpen(false);
       setEditingClient(null);
-      setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '', client_email: '', client_full_name: '' });
+      setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '' });
       fetchClients();
     } catch (error) {
       console.error('Error saving client:', error);
@@ -147,8 +116,6 @@ export default function AdminClients() {
         description: error instanceof Error ? error.message : 'Não foi possível salvar.',
         variant: 'destructive',
       });
-    } finally {
-      setCreatingUser(false);
     }
   };
 
@@ -159,8 +126,6 @@ export default function AdminClients() {
       logo_url: client.logo_url || '',
       google_ads_id: client.google_ads_id || '',
       google_drive_id: client.google_drive_id || '',
-      client_email: '',
-      client_full_name: '',
     });
     setIsDialogOpen(true);
   };
@@ -183,7 +148,7 @@ export default function AdminClients() {
 
   const handleOpenDialog = () => {
     setEditingClient(null);
-    setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '', client_email: '', client_full_name: '' });
+    setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '' });
     setIsDialogOpen(true);
   };
 
@@ -252,47 +217,12 @@ export default function AdminClients() {
                   placeholder="Ex: 1AbCdEfGhIjKlMnOpQrStUvWxYz"
                 />
               </div>
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Acesso ao Portal
-                </h4>
-                <div className="space-y-2">
-                  <Label htmlFor="client_email">Email do Cliente</Label>
-                  <Input
-                    id="client_email"
-                    type="email"
-                    value={formData.client_email}
-                    onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
-                    placeholder="cliente@empresa.com"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {editingClient ? 'Adicione um email para vincular um novo usuário' : 'O usuário receberá acesso ao portal'}
-                  </p>
-                </div>
-                <div className="space-y-2 mt-2">
-                  <Label htmlFor="client_full_name">Nome Completo</Label>
-                  <Input
-                    id="client_full_name"
-                    value={formData.client_full_name}
-                    onChange={(e) => setFormData({ ...formData, client_full_name: e.target.value })}
-                    placeholder="João da Silva"
-                  />
-                </div>
-              </div>
               <div className="flex justify-end gap-2 mt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={creatingUser}>
-                  {creatingUser ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    editingClient ? 'Salvar' : 'Criar'
-                  )}
+                <Button type="submit">
+                  {editingClient ? 'Salvar' : 'Criar'}
                 </Button>
               </div>
             </form>

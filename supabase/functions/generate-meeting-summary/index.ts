@@ -33,7 +33,8 @@ serve(async (req) => {
       );
     }
 
-    const { clientId } = await req.json();
+    const body = await req.json();
+    const { clientId, notes } = body;
 
     if (!clientId) {
       return new Response(
@@ -119,8 +120,8 @@ Seja objetivo, profissional e foque em entregar valor ao cliente. Use emojis mod
     const userPrompt = `Data de hoje: ${today}
 
 ${tasksContext}
-
-Gere o resumo da pauta de reunião para o cliente ${client.name}.`;
+${notes ? `\n## Anotações da Reunião:\n${notes}\n` : ""}
+Gere o resumo da pauta de reunião para o cliente ${client.name}.${notes ? " Inclua e formate as anotações fornecidas no resumo." : ""}`;
 
     // Call Lovable AI
     if (!LOVABLE_API_KEY) {
@@ -133,7 +134,7 @@ Gere o resumo da pauta de reunião para o cliente ${client.name}.`;
 
     console.log("[generate-meeting-summary] Calling Lovable AI...");
 
-    const aiResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

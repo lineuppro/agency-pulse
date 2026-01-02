@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, CheckCircle, Clock, ArrowRight, Loader2 } from 'lucide-react';
+import { Sparkles, CheckCircle, Clock, ArrowRight, Loader2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useMeetingAgendas, type MeetingAgenda as MeetingAgendaType } from '@/hooks/useMeetingAgendas';
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed';
 type TaskCategory = 'ads' | 'dev' | 'automation' | 'creative';
@@ -34,12 +37,16 @@ const categoryColors: Record<TaskCategory, string> = {
 };
 
 export default function MeetingAgenda() {
-  const { clientId } = useAuth();
+  const { clientId, session } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedAgenda, setSelectedAgenda] = useState<MeetingAgendaType | null>(null);
   const { toast } = useToast();
+
+  const { agendas, isLoading: loadingAgendas, fetchAgendas } = useMeetingAgendas(clientId);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -65,6 +72,9 @@ export default function MeetingAgenda() {
     };
 
     fetchTasks();
+    if (clientId) {
+      fetchAgendas();
+    }
   }, [clientId]);
 
   const pendingTasks = tasks.filter(t => t.status === 'pending');
@@ -72,29 +82,46 @@ export default function MeetingAgenda() {
   const completedTasks = tasks.filter(t => t.status === 'completed');
 
   const generateSummary = async () => {
+    if (!clientId || !session?.access_token) return;
+
     setGenerating(true);
-    // AI summary generation will be implemented in Phase 4
-    setTimeout(() => {
-      setSummary(`## Resumo da Reunião
+    setSelectedAgenda(null);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-meeting-summary`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ clientId }),
+        }
+      );
 
-### ✅ O que foi feito:
-${completedTasks.length > 0 
-  ? completedTasks.map(t => `- ${t.title}`).join('\n')
-  : '- Nenhuma tarefa concluída ainda'}
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate summary');
+      }
 
-### 🔄 Em andamento:
-${inProgressTasks.length > 0
-  ? inProgressTasks.map(t => `- ${t.title}`).join('\n')
-  : '- Nenhuma tarefa em progresso'}
-
-### 📋 Próximos passos:
-${pendingTasks.length > 0
-  ? pendingTasks.map(t => `- ${t.title}`).join('\n')
-  : '- Nenhuma tarefa pendente'}
-`);
-      setGenerating(false);
+      setSummary(data.summary);
       toast({ title: 'Resumo gerado!' });
-    }, 1500);
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      toast({
+        title: 'Erro ao gerar resumo',
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleViewAgenda = (agenda: MeetingAgendaType) => {
+    setSelectedAgenda(agenda);
+    setSummary(agenda.generated_summary);
+    setHistoryOpen(false);
   };
 
   if (!clientId) {
@@ -126,19 +153,27 @@ ${pendingTasks.length > 0
             Acompanhe o progresso das suas entregas
           </p>
         </div>
-        <Button onClick={generateSummary} disabled={generating || tasks.length === 0}>
-          {generating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Gerando...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Gerar Resumo com IA
-            </>
+        <div className="flex gap-2">
+          {agendas.length > 0 && (
+            <Button variant="outline" onClick={() => setHistoryOpen(true)}>
+              <History className="h-4 w-4 mr-2" />
+              Histórico
+            </Button>
           )}
-        </Button>
+          <Button onClick={generateSummary} disabled={generating || tasks.length === 0}>
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Gerando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Gerar Resumo com IA
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {summary && (
@@ -146,8 +181,18 @@ ${pendingTasks.length > 0
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              Resumo Gerado por IA
+              {selectedAgenda ? selectedAgenda.title : 'Resumo Gerado por IA'}
             </CardTitle>
+            {selectedAgenda && (
+              <CardDescription>
+                {new Date(selectedAgenda.meeting_date).toLocaleDateString('pt-BR', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </CardDescription>
+            )}
           </CardHeader>
           <CardContent>
             <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -287,6 +332,49 @@ ${pendingTasks.length > 0
           )}
         </CardContent>
       </Card>
+
+      {/* History Dialog */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Histórico de Pautas</DialogTitle>
+            <DialogDescription>
+              Pautas de reuniões anteriores
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            {loadingAgendas ? (
+              <div className="animate-pulse space-y-3 p-2">
+                {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted rounded" />)}
+              </div>
+            ) : agendas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhuma pauta salva ainda.
+              </p>
+            ) : (
+              <div className="space-y-2 p-2">
+                {agendas.map((agenda) => (
+                  <div
+                    key={agenda.id}
+                    className="p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer"
+                    onClick={() => handleViewAgenda(agenda)}
+                  >
+                    <h4 className="font-medium text-sm">{agenda.title || 'Sem título'}</h4>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(agenda.meeting_date).toLocaleDateString('pt-BR', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

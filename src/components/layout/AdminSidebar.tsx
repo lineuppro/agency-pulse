@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
+  Building2,
   Users, 
   CheckSquare, 
   MessageSquare, 
@@ -32,7 +33,8 @@ import {
 
 const menuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
-  { title: 'Clientes', url: '/admin/clients', icon: Users },
+  { title: 'Clientes', url: '/admin/clients', icon: Building2 },
+  { title: 'Usuários', url: '/admin/users', icon: Users },
   { title: 'Tarefas', url: '/admin/tasks', icon: CheckSquare },
   { title: 'Performance', url: '/admin/performance', icon: BarChart3 },
   { title: 'Arquivos', url: '/admin/files', icon: FolderOpen },
