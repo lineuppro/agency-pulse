@@ -65,12 +65,15 @@ serve(async (req) => {
       );
     }
 
-    const origin = req.headers.get('origin') || 'https://lovable.dev';
+    // Get the origin from the request, fallback to the preview URL
+    const origin = req.headers.get('origin');
+    const redirectUrl = origin ? `${origin}/auth` : 'https://id-preview--03c82de4-5145-464d-a8f5-35dd9e6d5b52.lovable.app/auth';
 
     if (action === "resend") {
       // Send password reset email
+      console.log(`[resend-invite] Sending reset email with redirectTo: ${redirectUrl}`);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${origin}/auth`,
+        redirectTo: redirectUrl,
       });
 
       if (error) {
