@@ -11,6 +11,18 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed';
 type TaskCategory = 'ads' | 'dev' | 'automation' | 'creative';
@@ -62,6 +74,106 @@ const categoryColors: Record<TaskCategory, string> = {
   creative: 'bg-orange-500/10 text-orange-500',
 };
 
+interface DraggableTaskCardProps {
+  task: Task;
+  getUserName: (userId: string | null) => string | null;
+}
+
+function DraggableTaskCard({ task, getUserName }: DraggableTaskCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className="border-border/50 cursor-grab active:cursor-grabbing hover:border-primary/30 transition-colors"
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-2 mb-2">
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm text-foreground truncate">
+              {task.title}
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              {task.clients?.name}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`${categoryColors[task.category]} text-xs`}>
+            <Tag className="h-3 w-3 mr-1" />
+            {categoryLabels[task.category]}
+          </Badge>
+          {task.due_date && (
+            <Badge variant="outline" className="text-xs">
+              <Calendar className="h-3 w-3 mr-1" />
+              {new Date(task.due_date).toLocaleDateString('pt-BR')}
+            </Badge>
+          )}
+          {task.meeting_agendas && (
+            <Badge variant="secondary" className="text-xs">
+              <FileText className="h-3 w-3 mr-1" />
+              Reunião
+            </Badge>
+          )}
+        </div>
+        {task.assigned_to && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+            <User className="h-3 w-3" />
+            <span>{getUserName(task.assigned_to)}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TaskCardOverlay({ task, getUserName }: DraggableTaskCardProps) {
+  return (
+    <Card className="border-border/50 shadow-lg cursor-grabbing rotate-3">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-2 mb-2">
+          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm text-foreground truncate">
+              {task.title}
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              {task.clients?.name}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`${categoryColors[task.category]} text-xs`}>
+            <Tag className="h-3 w-3 mr-1" />
+            {categoryLabels[task.category]}
+          </Badge>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminTasks() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -70,6 +182,7 @@ export default function AdminTasks() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [formData, setFormData] = useState({
     client_id: '',
     title: '',
@@ -79,6 +192,14 @@ export default function AdminTasks() {
     assigned_to: '',
   });
   const { toast } = useToast();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const fetchData = async () => {
     try {
@@ -180,6 +301,30 @@ export default function AdminTasks() {
         title: 'Erro ao atualizar status',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find(t => t.id === event.active.id);
+    if (task) setActiveTask(task);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null);
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const overId = over.id as string;
+
+    // Check if dropped on a column
+    const columns: TaskStatus[] = ['pending', 'in_progress', 'completed'];
+    if (columns.includes(overId as TaskStatus)) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task && task.status !== overId) {
+        updateTaskStatus(taskId, overId as TaskStatus);
+      }
     }
   };
 
@@ -346,95 +491,81 @@ export default function AdminTasks() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {columns.map((column) => (
-            <div key={column.key} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">{column.label}</h3>
-                <Badge variant="secondary" className="text-xs">
-                  {getTasksByStatus(column.key).length}
-                </Badge>
-              </div>
-              <div className="space-y-3 min-h-[200px] p-3 bg-muted/30 rounded-lg border border-border/50">
-                {loading ? (
-                  <div className="animate-pulse space-y-3">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="h-24 bg-muted rounded-lg" />
-                    ))}
-                  </div>
-                ) : (
-                  getTasksByStatus(column.key).map((task) => (
-                    <Card 
-                      key={task.id} 
-                      className="border-border/50 cursor-pointer hover:border-primary/30 transition-colors"
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-2 mb-2">
-                          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm text-foreground truncate">
-                              {task.title}
-                            </h4>
-                            <p className="text-xs text-muted-foreground">
-                              {task.clients?.name}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className={`${categoryColors[task.category]} text-xs`}>
-                            <Tag className="h-3 w-3 mr-1" />
-                            {categoryLabels[task.category]}
-                          </Badge>
-                          {task.due_date && (
-                            <Badge variant="outline" className="text-xs">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(task.due_date).toLocaleDateString('pt-BR')}
-                            </Badge>
-                          )}
-                          {task.meeting_agendas && (
-                            <Badge variant="secondary" className="text-xs">
-                              <FileText className="h-3 w-3 mr-1" />
-                              Reunião
-                            </Badge>
-                          )}
-                        </div>
-                        {task.assigned_to && (
-                          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                            <User className="h-3 w-3" />
-                            <span>{getUserName(task.assigned_to)}</span>
-                          </div>
-                        )}
-                        <div className="mt-3 pt-3 border-t border-border">
-                          <Select 
-                            value={task.status} 
-                            onValueChange={(v) => updateTaskStatus(task.id, v as TaskStatus)}
-                          >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {columns.map((col) => (
-                                <SelectItem key={col.key} value={col.key}>
-                                  {col.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-                {!loading && getTasksByStatus(column.key).length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Nenhuma tarefa
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {columns.map((column) => (
+              <DroppableColumn
+                key={column.key}
+                status={column.key}
+                label={column.label}
+                tasks={getTasksByStatus(column.key)}
+                loading={loading}
+                getUserName={getUserName}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeTask ? (
+              <TaskCardOverlay task={activeTask} getUserName={getUserName} />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
+    </div>
+  );
+}
+
+interface DroppableColumnProps {
+  status: TaskStatus;
+  label: string;
+  tasks: Task[];
+  loading: boolean;
+  getUserName: (userId: string | null) => string | null;
+}
+
+function DroppableColumn({ status, label, tasks, loading, getUserName }: DroppableColumnProps) {
+  const { setNodeRef, isOver } = useSortable({
+    id: status,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground">{label}</h3>
+        <Badge variant="secondary" className="text-xs">
+          {tasks.length}
+        </Badge>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={`space-y-3 min-h-[200px] p-3 rounded-lg border transition-colors ${
+          isOver
+            ? 'bg-primary/10 border-primary'
+            : 'bg-muted/30 border-border/50'
+        }`}
+      >
+        {loading ? (
+          <div className="animate-pulse space-y-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-24 bg-muted rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <DraggableTaskCard key={task.id} task={task} getUserName={getUserName} />
+          ))
+        )}
+        {!loading && tasks.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhuma tarefa
+          </p>
+        )}
+      </div>
     </div>
   );
 }

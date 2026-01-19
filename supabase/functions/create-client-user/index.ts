@@ -23,11 +23,11 @@ serve(async (req) => {
       );
     }
 
-    const { clientId, email, fullName } = await req.json();
+    const { clientId, email, fullName, password } = await req.json();
 
-    if (!clientId || !email) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ error: "clientId and email are required" }),
+        JSON.stringify({ error: "Email é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -36,12 +36,20 @@ serve(async (req) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return new Response(
-        JSON.stringify({ error: "Invalid email format" }),
+        JSON.stringify({ error: "Formato de email inválido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[create-client-user] Creating user for client: ${clientId}, email: ${email}`);
+    // Validate password if provided
+    if (password && password.length < 6) {
+      return new Response(
+        JSON.stringify({ error: "A senha deve ter pelo menos 6 caracteres" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[create-client-user] Creating user: ${email}, client: ${clientId || 'none'}`);
 
     // Initialize Supabase admin client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -74,7 +82,7 @@ serve(async (req) => {
       const { error: updateProfileError } = await supabase
         .from("profiles")
         .update({ 
-          client_id: clientId,
+          client_id: clientId || null,
           full_name: fullName || null,
         })
         .eq("user_id", existingUser.id);
@@ -108,13 +116,13 @@ serve(async (req) => {
       );
     }
 
-    // Generate temporary password
-    const tempPassword = crypto.randomUUID().slice(0, 12) + "Aa1!";
+    // Use provided password or generate a temporary one
+    const userPassword = password || (crypto.randomUUID().slice(0, 12) + "Aa1!");
 
     // Create new user
     const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
       email,
-      password: tempPassword,
+      password: userPassword,
       email_confirm: true,
       user_metadata: {
         full_name: fullName || email.split("@")[0],
@@ -138,7 +146,7 @@ serve(async (req) => {
     const { error: profileError } = await supabase
       .from("profiles")
       .update({ 
-        client_id: clientId,
+        client_id: clientId || null,
         full_name: fullName || email.split("@")[0],
       })
       .eq("user_id", newUser.user.id);
@@ -149,7 +157,7 @@ serve(async (req) => {
       await supabase.from("profiles").insert({
         user_id: newUser.user.id,
         email: email,
-        client_id: clientId,
+        client_id: clientId || null,
         full_name: fullName || email.split("@")[0],
       });
     }
@@ -163,29 +171,15 @@ serve(async (req) => {
       console.error("[create-client-user] Error adding role:", roleError);
     }
 
-    // Send invite email so user can set their own password
-    const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${req.headers.get('origin') || SUPABASE_URL}/auth`,
-    });
-
-    if (inviteError) {
-      console.error("[create-client-user] Error sending invite:", inviteError);
-      // If invite fails, try password reset as fallback
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${req.headers.get('origin') || SUPABASE_URL}/auth`,
-      });
-      if (resetError) {
-        console.error("[create-client-user] Error sending reset email:", resetError);
-      }
-    }
-
-    console.log(`[create-client-user] Successfully created user and linked to client`);
+    console.log(`[create-client-user] Successfully created user with password set by admin`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         userId: newUser.user.id,
-        message: "Usuário criado com sucesso. Um email de configuração de senha foi enviado." 
+        message: password 
+          ? "Usuário criado com sucesso! A senha foi definida conforme solicitado."
+          : "Usuário criado com senha temporária. Solicite ao usuário que redefina sua senha."
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
