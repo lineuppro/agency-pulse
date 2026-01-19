@@ -146,6 +146,53 @@ export type Database = {
           },
         ]
       }
+      editorial_contents: {
+        Row: {
+          client_id: string
+          content_type: Database["public"]["Enums"]["content_type"]
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          scheduled_date: string
+          status: Database["public"]["Enums"]["content_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          content_type: Database["public"]["Enums"]["content_type"]
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["content_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          content_type?: Database["public"]["Enums"]["content_type"]
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["content_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_contents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_agendas: {
         Row: {
           client_id: string
@@ -319,6 +366,19 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "client"
+      content_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "rejected"
+        | "published"
+      content_type:
+        | "instagram"
+        | "facebook"
+        | "blog"
+        | "email"
+        | "google_ads"
+        | "other"
       task_category: "ads" | "dev" | "automation" | "creative"
       task_status: "pending" | "in_progress" | "completed"
     }
@@ -449,6 +509,21 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "client"],
+      content_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "published",
+      ],
+      content_type: [
+        "instagram",
+        "facebook",
+        "blog",
+        "email",
+        "google_ads",
+        "other",
+      ],
       task_category: ["ads", "dev", "automation", "creative"],
       task_status: ["pending", "in_progress", "completed"],
     },
