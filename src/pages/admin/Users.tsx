@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users as UsersIcon, Mail, Loader2, Send, RotateCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users as UsersIcon, Mail, Loader2, RotateCw, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,10 +33,12 @@ export default function AdminUsers() {
   const [submitting, setSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
     client_id: '',
+    password: '',
   });
   const { toast } = useToast();
 
@@ -172,6 +174,17 @@ export default function AdminUsers() {
         // Create new user via edge function
         if (!session?.access_token) throw new Error('Não autenticado');
 
+        // Validate password
+        if (!formData.password || formData.password.length < 6) {
+          toast({
+            title: 'Senha inválida',
+            description: 'A senha deve ter pelo menos 6 caracteres.',
+            variant: 'destructive',
+          });
+          setSubmitting(false);
+          return;
+        }
+
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-client-user`,
           {
@@ -184,6 +197,7 @@ export default function AdminUsers() {
               clientId: formData.client_id || null,
               email: formData.email,
               fullName: formData.full_name || null,
+              password: formData.password,
             }),
           }
         );
@@ -197,7 +211,8 @@ export default function AdminUsers() {
 
       setIsDialogOpen(false);
       setEditingUser(null);
-      setFormData({ email: '', full_name: '', client_id: '' });
+      setFormData({ email: '', full_name: '', client_id: '', password: '' });
+      setShowPassword(false);
       fetchUsers();
     } catch (error) {
       console.error('Error saving user:', error);
@@ -217,13 +232,15 @@ export default function AdminUsers() {
       email: user.email,
       full_name: user.full_name || '',
       client_id: user.client_id || '',
+      password: '',
     });
     setIsDialogOpen(true);
   };
 
   const handleOpenDialog = () => {
     setEditingUser(null);
-    setFormData({ email: '', full_name: '', client_id: '' });
+    setFormData({ email: '', full_name: '', client_id: '', password: '' });
+    setShowPassword(false);
     setIsDialogOpen(true);
   };
 
@@ -257,7 +274,7 @@ export default function AdminUsers() {
               <DialogDescription>
                 {editingUser
                   ? 'Atualize as informações do usuário.'
-                  : 'Crie um novo usuário e vincule a uma empresa.'}
+                  : 'Crie um novo usuário com email e senha.'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -278,6 +295,38 @@ export default function AdminUsers() {
                   </p>
                 )}
               </div>
+              {!editingUser && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                      minLength={6}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Defina a senha inicial. O usuário poderá alterá-la depois.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="full_name">Nome Completo</Label>
                 <Input
@@ -469,9 +518,9 @@ export default function AdminUsers() {
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        <AlertDialogAction 
                           onClick={() => handleDeleteUser(user.email)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                           Excluir
                         </AlertDialogAction>
