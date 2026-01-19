@@ -7,7 +7,8 @@ import {
   Zap,
   Sun,
   Moon,
-  FolderOpen
+  FolderOpen,
+  CalendarDays
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ const menuItems = [
   { title: 'Pauta de Reunião', url: '/portal', icon: FileText },
   { title: 'Performance', url: '/portal/performance', icon: BarChart3 },
   { title: 'Arquivos', url: '/portal/files', icon: FolderOpen },
+  { title: 'Calendário Editorial', url: '/portal/calendar', icon: CalendarDays },
   { title: 'Chat com IA', url: '/portal/chat', icon: MessageSquare },
 ];
 
