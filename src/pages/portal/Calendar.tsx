@@ -2,19 +2,20 @@ import { useState, useMemo } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { CalendarView } from '@/components/calendar/CalendarView';
-import { ContentDetailModal } from '@/components/calendar/ContentDetailModal';
+import { ContentSidebar } from '@/components/calendar/ContentSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   useEditorialCalendar, 
   type EditorialContent,
   type ContentStatus 
 } from '@/hooks/useEditorialCalendar';
+import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
 
 export default function PortalCalendar() {
   const { clientId } = useAuth();
   const [view, setView] = useState<'week' | 'month'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [viewingContent, setViewingContent] = useState<EditorialContent | null>(null);
 
   // Calculate date range based on view
@@ -44,9 +45,19 @@ export default function PortalCalendar() {
     dateRange.end
   );
 
+  // Fetch campaigns to show campaign name in sidebar
+  const { campaigns } = useEditorialCampaigns(clientId || undefined);
+
+  // Get campaign name for sidebar
+  const getCampaignName = (campaignId: string | null) => {
+    if (!campaignId) return undefined;
+    const campaign = campaigns.find(c => c.id === campaignId);
+    return campaign?.name;
+  };
+
   const handleContentClick = (content: EditorialContent) => {
     setViewingContent(content);
-    setIsDetailModalOpen(true);
+    setIsSidebarOpen(true);
   };
 
   const handleStatusChange = (id: string, status: ContentStatus) => {
@@ -91,14 +102,15 @@ export default function PortalCalendar() {
         />
       </div>
 
-      <ContentDetailModal
-        open={isDetailModalOpen}
+      <ContentSidebar
+        open={isSidebarOpen}
         onOpenChange={(open) => {
-          setIsDetailModalOpen(open);
+          setIsSidebarOpen(open);
           if (!open) setViewingContent(null);
         }}
         content={viewingContent}
         isAdmin={false}
+        campaignName={viewingContent ? getCampaignName(viewingContent.campaign_id) : undefined}
         onStatusChange={handleStatusChange}
       />
     </div>

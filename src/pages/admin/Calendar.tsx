@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, CalendarDays } from 'lucide-react';
+import { Plus, CalendarDays, FolderPlus, Filter } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -13,19 +13,24 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { ContentModal } from '@/components/calendar/ContentModal';
-import { ContentDetailModal } from '@/components/calendar/ContentDetailModal';
+import { ContentSidebar } from '@/components/calendar/ContentSidebar';
+import { CampaignModal } from '@/components/calendar/CampaignModal';
 import { 
   useEditorialCalendar, 
   type EditorialContent,
-  type ContentStatus 
+  type ContentStatus,
+  type ContentType
 } from '@/hooks/useEditorialCalendar';
+import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
 
 export default function AdminCalendar() {
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
   const [view, setView] = useState<'week' | 'month'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<EditorialContent | null>(null);
   const [viewingContent, setViewingContent] = useState<EditorialContent | null>(null);
 
@@ -41,6 +46,11 @@ export default function AdminCalendar() {
       return data;
     },
   });
+
+  // Fetch campaigns for filtering
+  const { campaigns, createCampaign } = useEditorialCampaigns(
+    selectedClientId === 'all' ? undefined : selectedClientId
+  );
 
   // Calculate date range based on view
   const dateRange = useMemo(() => {
@@ -69,10 +79,18 @@ export default function AdminCalendar() {
   } = useEditorialCalendar(
     selectedClientId === 'all' ? undefined : selectedClientId,
     dateRange.start,
-    dateRange.end
+    dateRange.end,
+    selectedCampaignId === 'all' ? undefined : selectedCampaignId
   );
 
-  const handleSaveContent = (data: { id?: string; client_id: string; title: string; description?: string; content_type: any; scheduled_date: string; status?: ContentStatus }) => {
+  // Get campaign name for sidebar
+  const getCampaignName = (campaignId: string | null) => {
+    if (!campaignId) return undefined;
+    const campaign = campaigns.find(c => c.id === campaignId);
+    return campaign?.name;
+  };
+
+  const handleSaveContent = (data: { id?: string; client_id: string; title: string; description?: string; content_type: ContentType; scheduled_date: string; status?: ContentStatus }) => {
     if (data.id) {
       updateContent.mutate({
         id: data.id,
@@ -103,6 +121,29 @@ export default function AdminCalendar() {
     }
   };
 
+  const handleSidebarSave = (data: { 
+    id: string; 
+    title: string; 
+    description?: string; 
+    content_type: ContentType;
+    scheduled_date: string;
+    status: ContentStatus;
+  }) => {
+    updateContent.mutate({
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      content_type: data.content_type,
+      scheduled_date: data.scheduled_date,
+      status: data.status,
+    }, {
+      onSuccess: () => {
+        setIsSidebarOpen(false);
+        setViewingContent(null);
+      },
+    });
+  };
+
   const handleEditContent = (content: EditorialContent) => {
     setEditingContent(content);
     setIsModalOpen(true);
@@ -110,17 +151,34 @@ export default function AdminCalendar() {
 
   const handleContentClick = (content: EditorialContent) => {
     setViewingContent(content);
-    setIsDetailModalOpen(true);
+    setIsSidebarOpen(true);
   };
 
   const handleDeleteContent = (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este conteúdo?')) {
-      deleteContent.mutate(id);
-    }
+    deleteContent.mutate(id, {
+      onSuccess: () => {
+        setIsSidebarOpen(false);
+        setViewingContent(null);
+      },
+    });
   };
 
   const handleStatusChange = (id: string, status: ContentStatus) => {
     updateStatus.mutate({ id, status });
+  };
+
+  const handleCreateCampaign = (data: Parameters<typeof createCampaign.mutate>[0]) => {
+    createCampaign.mutate(data, {
+      onSuccess: () => {
+        setIsCampaignModalOpen(false);
+      },
+    });
+  };
+
+  // Reset campaign filter when client changes
+  const handleClientChange = (clientId: string) => {
+    setSelectedClientId(clientId);
+    setSelectedCampaignId('all');
   };
 
   return (
@@ -139,7 +197,7 @@ export default function AdminCalendar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+          <Select value={selectedClientId} onValueChange={handleClientChange}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Selecione o cliente" />
             </SelectTrigger>
@@ -152,6 +210,28 @@ export default function AdminCalendar() {
               ))}
             </SelectContent>
           </Select>
+
+          {campaigns.length > 0 && (
+            <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+              <SelectTrigger className="w-[200px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filtrar campanha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as campanhas</SelectItem>
+                {campaigns.map((campaign) => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Button variant="outline" onClick={() => setIsCampaignModalOpen(true)}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            Criar Campanha
+          </Button>
 
           <Button onClick={() => { setEditingContent(null); setIsModalOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
@@ -188,17 +268,28 @@ export default function AdminCalendar() {
         isLoading={createContent.isPending || updateContent.isPending}
       />
 
-      <ContentDetailModal
-        open={isDetailModalOpen}
+      <ContentSidebar
+        open={isSidebarOpen}
         onOpenChange={(open) => {
-          setIsDetailModalOpen(open);
+          setIsSidebarOpen(open);
           if (!open) setViewingContent(null);
         }}
         content={viewingContent}
         isAdmin={true}
-        onEdit={handleEditContent}
+        campaignName={viewingContent ? getCampaignName(viewingContent.campaign_id) : undefined}
+        onSave={handleSidebarSave}
         onDelete={handleDeleteContent}
         onStatusChange={handleStatusChange}
+        isLoading={updateContent.isPending}
+      />
+
+      <CampaignModal
+        open={isCampaignModalOpen}
+        onOpenChange={setIsCampaignModalOpen}
+        clients={clients}
+        selectedClientId={selectedClientId !== 'all' ? selectedClientId : undefined}
+        onSave={handleCreateCampaign}
+        isLoading={createCampaign.isPending}
       />
     </div>
   );

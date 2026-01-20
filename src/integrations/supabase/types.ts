@@ -146,8 +146,68 @@ export type Database = {
           },
         ]
       }
+      editorial_campaigns: {
+        Row: {
+          blog_count: number
+          client_id: string
+          created_at: string
+          created_by: string
+          email_count: number
+          end_date: string
+          facebook_count: number
+          google_ads_count: number
+          id: string
+          instagram_count: number
+          name: string
+          notes: string | null
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          blog_count?: number
+          client_id: string
+          created_at?: string
+          created_by: string
+          email_count?: number
+          end_date: string
+          facebook_count?: number
+          google_ads_count?: number
+          id?: string
+          instagram_count?: number
+          name: string
+          notes?: string | null
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          blog_count?: number
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          email_count?: number
+          end_date?: string
+          facebook_count?: number
+          google_ads_count?: number
+          id?: string
+          instagram_count?: number
+          name?: string
+          notes?: string | null
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       editorial_contents: {
         Row: {
+          campaign_id: string | null
           client_id: string
           content_type: Database["public"]["Enums"]["content_type"]
           created_at: string
@@ -160,6 +220,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          campaign_id?: string | null
           client_id: string
           content_type: Database["public"]["Enums"]["content_type"]
           created_at?: string
@@ -172,6 +233,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          campaign_id?: string | null
           client_id?: string
           content_type?: Database["public"]["Enums"]["content_type"]
           created_at?: string
@@ -184,6 +246,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "editorial_contents_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "editorial_contents_client_id_fkey"
             columns: ["client_id"]

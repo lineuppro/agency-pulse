@@ -13,6 +13,7 @@ export interface EditorialContent {
   content_type: ContentType;
   scheduled_date: string;
   status: ContentStatus;
+  campaign_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -36,11 +37,11 @@ export interface UpdateContentData {
   status?: ContentStatus;
 }
 
-export function useEditorialCalendar(clientId?: string, startDate?: Date, endDate?: Date) {
+export function useEditorialCalendar(clientId?: string, startDate?: Date, endDate?: Date, campaignId?: string) {
   const queryClient = useQueryClient();
 
   const { data: contents = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['editorial-contents', clientId, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ['editorial-contents', clientId, startDate?.toISOString(), endDate?.toISOString(), campaignId],
     queryFn: async () => {
       let query = supabase
         .from('editorial_contents')
@@ -57,6 +58,10 @@ export function useEditorialCalendar(clientId?: string, startDate?: Date, endDat
 
       if (endDate) {
         query = query.lte('scheduled_date', endDate.toISOString().split('T')[0]);
+      }
+
+      if (campaignId) {
+        query = query.eq('campaign_id', campaignId);
       }
 
       const { data, error } = await query;
