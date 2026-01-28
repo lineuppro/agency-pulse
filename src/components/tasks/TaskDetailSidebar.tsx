@@ -251,8 +251,8 @@ export function TaskDetailSidebar({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 mt-0 px-6 data-[state=active]:flex">
-            <div className="flex-1 overflow-auto mt-4">
+          <TabsContent value="comments" className="flex-1 flex flex-col overflow-hidden mt-0 px-6 data-[state=active]:flex">
+            <div className="flex-1 overflow-y-auto py-4 space-y-4">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2].map((i) => (
@@ -264,45 +264,43 @@ export function TaskDetailSidebar({
                   Nenhum comentário ainda
                 </p>
               ) : (
-                <div className="space-y-4 pb-4">
-                  {comments.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="bg-muted/50 rounded-lg p-3 space-y-1"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {comment.user_name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(comment.created_at), "dd/MM/yy 'às' HH:mm", {
-                            locale: ptBR,
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground whitespace-pre-wrap">
-                        {comment.content}
-                      </p>
+                comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="bg-muted/50 rounded-lg p-3 space-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {comment.user_name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(comment.created_at), "dd/MM/yy 'às' HH:mm", {
+                          locale: ptBR,
+                        })}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                      {comment.content}
+                    </p>
+                  </div>
+                ))
               )}
             </div>
 
-            <div className="py-4 border-t mt-auto">
-              <div className="flex gap-2">
+            <div className="shrink-0 py-4 border-t">
+              <div className="flex gap-2 items-end">
                 <Textarea
                   placeholder="Escreva um comentário..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  rows={2}
-                  className="resize-none"
+                  rows={3}
+                  className="resize-none min-h-[80px]"
                 />
                 <Button
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
                   size="icon"
-                  className="shrink-0"
+                  className="shrink-0 h-10 w-10"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
