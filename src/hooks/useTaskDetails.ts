@@ -148,25 +148,37 @@ export function useTaskDetails(taskId: string | null) {
     if (!taskId || !user) return;
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${taskId}/${Date.now()}_${file.name}`;
+      // Sanitize file name and create a safe path
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${taskId}/${Date.now()}_${sanitizedFileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('task-attachments')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
 
       const { error: dbError } = await supabase.from('task_attachments').insert([{
         task_id: taskId,
         user_id: user.id,
         file_name: file.name,
         file_path: filePath,
-        file_type: file.type,
+        file_type: file.type || 'application/octet-stream',
         file_size: file.size,
       }]);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database insert error:', dbError);
+        // Try to clean up the uploaded file
+        await supabase.storage.from('task-attachments').remove([filePath]);
+        throw dbError;
+      }
 
       // Log activity
       await supabase.from('task_activity_log').insert([{
@@ -178,9 +190,14 @@ export function useTaskDetails(taskId: string | null) {
 
       toast({ title: 'Arquivo anexado!' });
       fetchTaskDetails();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error uploading attachment:', error);
-      toast({ title: 'Erro ao anexar arquivo', variant: 'destructive' });
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast({ 
+        title: 'Erro ao anexar arquivo', 
+        description: errorMessage,
+        variant: 'destructive' 
+      });
     }
   };
 

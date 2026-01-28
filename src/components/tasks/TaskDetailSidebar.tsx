@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -251,8 +251,8 @@ export function TaskDetailSidebar({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 mt-0 px-6">
-            <ScrollArea className="flex-1 mt-4">
+          <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 mt-0 px-6 data-[state=active]:flex">
+            <div className="flex-1 overflow-auto mt-4">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2].map((i) => (
@@ -287,7 +287,7 @@ export function TaskDetailSidebar({
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
             <div className="py-4 border-t mt-auto">
               <div className="flex gap-2">
@@ -310,8 +310,8 @@ export function TaskDetailSidebar({
             </div>
           </TabsContent>
 
-          <TabsContent value="attachments" className="flex-1 flex flex-col min-h-0 mt-0 px-6">
-            <ScrollArea className="flex-1 mt-4">
+          <TabsContent value="attachments" className="flex-1 flex flex-col min-h-0 mt-0 px-6 data-[state=active]:flex">
+            <div className="flex-1 overflow-auto mt-4">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2].map((i) => (
@@ -367,13 +367,14 @@ export function TaskDetailSidebar({
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
             <div className="py-4 border-t mt-auto">
               <input
                 ref={fileInputRef}
                 type="file"
                 onChange={handleFileSelect}
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
                 className="hidden"
               />
               <Button
@@ -387,8 +388,8 @@ export function TaskDetailSidebar({
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="flex-1 flex flex-col min-h-0 mt-0 px-6">
-            <ScrollArea className="flex-1 mt-4">
+          <TabsContent value="history" className="flex-1 flex flex-col min-h-0 mt-0 px-6 data-[state=active]:flex">
+            <div className="flex-1 overflow-auto mt-4">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
@@ -428,7 +429,7 @@ export function TaskDetailSidebar({
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
         </Tabs>
 
