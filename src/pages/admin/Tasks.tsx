@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Plus, GripVertical, Calendar, Tag, User, FileText } from 'lucide-react';
+import { Plus, Archive, ArchiveRestore } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,8 +21,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { TaskColumn } from '@/components/tasks/TaskColumn';
+import { TaskCardOverlay } from '@/components/tasks/TaskCard';
+import { TaskDetailSidebar } from '@/components/tasks/TaskDetailSidebar';
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed';
 type TaskCategory = 'ads' | 'dev' | 'automation' | 'creative';
@@ -38,8 +39,11 @@ interface Task {
   assigned_to: string | null;
   meeting_agenda_id: string | null;
   created_at: string;
+  archived_at?: string | null;
   clients?: { name: string } | null;
   meeting_agendas?: { title: string; meeting_date: string } | null;
+  comments_count?: number;
+  attachments_count?: number;
 }
 
 interface Client {
@@ -54,125 +58,12 @@ interface UserProfile {
   client_id: string | null;
 }
 
-const statusLabels: Record<TaskStatus, string> = {
-  pending: 'Pendente',
-  in_progress: 'Em Progresso',
-  completed: 'Concluído',
-};
-
 const categoryLabels: Record<TaskCategory, string> = {
   ads: 'Anúncios',
   dev: 'Desenvolvimento',
   automation: 'Automação',
   creative: 'Criativo',
 };
-
-const categoryColors: Record<TaskCategory, string> = {
-  ads: 'bg-blue-500/10 text-blue-500',
-  dev: 'bg-green-500/10 text-green-500',
-  automation: 'bg-purple-500/10 text-purple-500',
-  creative: 'bg-orange-500/10 text-orange-500',
-};
-
-interface DraggableTaskCardProps {
-  task: Task;
-  getUserName: (userId: string | null) => string | null;
-}
-
-function DraggableTaskCard({ task, getUserName }: DraggableTaskCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      className="border-border/50 cursor-grab active:cursor-grabbing hover:border-primary/30 transition-colors"
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-2 mb-2">
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing"
-          >
-            <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-sm text-foreground truncate">
-              {task.title}
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              {task.clients?.name}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`${categoryColors[task.category]} text-xs`}>
-            <Tag className="h-3 w-3 mr-1" />
-            {categoryLabels[task.category]}
-          </Badge>
-          {task.due_date && (
-            <Badge variant="outline" className="text-xs">
-              <Calendar className="h-3 w-3 mr-1" />
-              {new Date(task.due_date).toLocaleDateString('pt-BR')}
-            </Badge>
-          )}
-          {task.meeting_agendas && (
-            <Badge variant="secondary" className="text-xs">
-              <FileText className="h-3 w-3 mr-1" />
-              Reunião
-            </Badge>
-          )}
-        </div>
-        {task.assigned_to && (
-          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <User className="h-3 w-3" />
-            <span>{getUserName(task.assigned_to)}</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function TaskCardOverlay({ task, getUserName }: DraggableTaskCardProps) {
-  return (
-    <Card className="border-border/50 shadow-lg cursor-grabbing rotate-3">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-2 mb-2">
-          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-sm text-foreground truncate">
-              {task.title}
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              {task.clients?.name}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`${categoryColors[task.category]} text-xs`}>
-            <Tag className="h-3 w-3 mr-1" />
-            {categoryLabels[task.category]}
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export default function AdminTasks() {
   const { user } = useAuth();
@@ -182,7 +73,10 @@ export default function AdminTasks() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
+  const [showArchived, setShowArchived] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [formData, setFormData] = useState({
     client_id: '',
     title: '',
@@ -203,11 +97,24 @@ export default function AdminTasks() {
 
   const fetchData = async () => {
     try {
+      // Calculate 60 days ago for auto-archiving
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+      // Build query based on archive filter
+      let tasksQuery = supabase
+        .from('tasks')
+        .select('*, clients(name), meeting_agendas(title, meeting_date)')
+        .order('created_at', { ascending: false });
+
+      if (showArchived) {
+        tasksQuery = tasksQuery.not('archived_at', 'is', null);
+      } else {
+        tasksQuery = tasksQuery.is('archived_at', null);
+      }
+
       const [tasksRes, clientsRes, usersRes] = await Promise.all([
-        supabase
-          .from('tasks')
-          .select('*, clients(name), meeting_agendas(title, meeting_date)')
-          .order('created_at', { ascending: false }),
+        tasksQuery,
         supabase.from('clients').select('id, name').order('name'),
         supabase.from('profiles').select('user_id, full_name, email, client_id'),
       ]);
@@ -216,7 +123,54 @@ export default function AdminTasks() {
       if (clientsRes.error) throw clientsRes.error;
       if (usersRes.error) throw usersRes.error;
 
-      setTasks(tasksRes.data || []);
+      // Auto-archive completed tasks older than 60 days
+      const tasksToArchive = (tasksRes.data || []).filter(
+        (t) =>
+          t.status === 'completed' &&
+          !t.archived_at &&
+          new Date(t.updated_at) < sixtyDaysAgo
+      );
+
+      if (tasksToArchive.length > 0) {
+        await supabase
+          .from('tasks')
+          .update({ archived_at: new Date().toISOString() })
+          .in('id', tasksToArchive.map((t) => t.id));
+      }
+
+      // Fetch comments and attachments counts
+      const taskIds = (tasksRes.data || []).map((t) => t.id);
+      
+      const [commentsCountRes, attachmentsCountRes] = await Promise.all([
+        supabase
+          .from('task_comments')
+          .select('task_id')
+          .in('task_id', taskIds),
+        supabase
+          .from('task_attachments')
+          .select('task_id')
+          .in('task_id', taskIds),
+      ]);
+
+      const commentsCount: Record<string, number> = {};
+      const attachmentsCount: Record<string, number> = {};
+
+      commentsCountRes.data?.forEach((c) => {
+        commentsCount[c.task_id] = (commentsCount[c.task_id] || 0) + 1;
+      });
+      attachmentsCountRes.data?.forEach((a) => {
+        attachmentsCount[a.task_id] = (attachmentsCount[a.task_id] || 0) + 1;
+      });
+
+      const tasksWithCounts = (tasksRes.data || [])
+        .filter((t) => !tasksToArchive.find((ta) => ta.id === t.id))
+        .map((t) => ({
+          ...t,
+          comments_count: commentsCount[t.id] || 0,
+          attachments_count: attachmentsCount[t.id] || 0,
+        }));
+
+      setTasks(tasksWithCounts as Task[]);
       setClients(clientsRes.data || []);
       setUsers(usersRes.data || []);
     } catch (error) {
@@ -232,31 +186,29 @@ export default function AdminTasks() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [showArchived]);
 
-  // Get available users for a specific client (users linked to that client + current admin)
   const getAvailableUsers = (clientId: string) => {
-    const clientUsers = users.filter(u => u.client_id === clientId);
-    const adminUser = users.find(u => u.user_id === user?.id);
-    
-    // Combine and deduplicate
+    const clientUsers = users.filter((u) => u.client_id === clientId);
+    const adminUser = users.find((u) => u.user_id === user?.id);
+
     const allUsers = [...clientUsers];
-    if (adminUser && !allUsers.find(u => u.user_id === adminUser.user_id)) {
+    if (adminUser && !allUsers.find((u) => u.user_id === adminUser.user_id)) {
       allUsers.unshift(adminUser);
     }
-    
+
     return allUsers;
   };
 
   const getUserName = (userId: string | null) => {
     if (!userId) return null;
-    const userProfile = users.find(u => u.user_id === userId);
+    const userProfile = users.find((u) => u.user_id === userId);
     return userProfile?.full_name || userProfile?.email?.split('@')[0] || null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const { error } = await supabase.from('tasks').insert({
         client_id: formData.client_id,
@@ -268,10 +220,17 @@ export default function AdminTasks() {
       });
 
       if (error) throw error;
-      
+
       toast({ title: 'Tarefa criada com sucesso!' });
       setIsDialogOpen(false);
-      setFormData({ client_id: '', title: '', description: '', category: 'ads', due_date: '', assigned_to: '' });
+      setFormData({
+        client_id: '',
+        title: '',
+        description: '',
+        category: 'ads',
+        due_date: '',
+        assigned_to: '',
+      });
       fetchData();
     } catch (error) {
       console.error('Error creating task:', error);
@@ -290,10 +249,20 @@ export default function AdminTasks() {
         .eq('id', taskId);
 
       if (error) throw error;
-      
-      setTasks(tasks.map(t => 
-        t.id === taskId ? { ...t, status: newStatus } : t
-      ));
+
+      // Log activity
+      if (user) {
+        await supabase.from('task_activity_log').insert([{
+          task_id: taskId,
+          user_id: user.id,
+          action: 'status_changed',
+          details: { new_status: newStatus },
+        }]);
+      }
+
+      setTasks(
+        tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+      );
       toast({ title: 'Status atualizado!' });
     } catch (error) {
       console.error('Error updating task:', error);
@@ -304,8 +273,25 @@ export default function AdminTasks() {
     }
   };
 
+  const deleteTask = async (taskId: string) => {
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+
+      if (error) throw error;
+
+      setTasks(tasks.filter((t) => t.id !== taskId));
+      toast({ title: 'Tarefa excluída!' });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        title: 'Erro ao excluir tarefa',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
-    const task = tasks.find(t => t.id === event.active.id);
+    const task = tasks.find((t) => t.id === event.active.id);
     if (task) setActiveTask(task);
   };
 
@@ -318,14 +304,18 @@ export default function AdminTasks() {
     const taskId = active.id as string;
     const overId = over.id as string;
 
-    // Check if dropped on a column
     const columns: TaskStatus[] = ['pending', 'in_progress', 'completed'];
     if (columns.includes(overId as TaskStatus)) {
-      const task = tasks.find(t => t.id === taskId);
+      const task = tasks.find((t) => t.id === taskId);
       if (task && task.status !== overId) {
         updateTaskStatus(taskId, overId as TaskStatus);
       }
     }
+  };
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsSidebarOpen(true);
   };
 
   const columns: { key: TaskStatus; label: string }[] = [
@@ -334,14 +324,17 @@ export default function AdminTasks() {
     { key: 'completed', label: 'Concluído' },
   ];
 
-  const filteredTasks = selectedClientFilter === 'all' 
-    ? tasks 
-    : tasks.filter(t => t.client_id === selectedClientFilter);
+  const filteredTasks =
+    selectedClientFilter === 'all'
+      ? tasks
+      : tasks.filter((t) => t.client_id === selectedClientFilter);
 
-  const getTasksByStatus = (status: TaskStatus) => 
-    filteredTasks.filter(t => t.status === status);
+  const getTasksByStatus = (status: TaskStatus) =>
+    filteredTasks.filter((t) => t.status === status);
 
-  const availableUsersForForm = formData.client_id ? getAvailableUsers(formData.client_id) : [];
+  const availableUsersForForm = formData.client_id
+    ? getAvailableUsers(formData.client_id)
+    : [];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -352,8 +345,31 @@ export default function AdminTasks() {
             Gerencie as entregas de todos os clientes
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Select value={selectedClientFilter} onValueChange={setSelectedClientFilter}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-archived"
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+            />
+            <Label htmlFor="show-archived" className="text-sm flex items-center gap-1 cursor-pointer">
+              {showArchived ? (
+                <>
+                  <ArchiveRestore className="h-4 w-4" />
+                  Arquivadas
+                </>
+              ) : (
+                <>
+                  <Archive className="h-4 w-4" />
+                  Ver arquivadas
+                </>
+              )}
+            </Label>
+          </div>
+          <Select
+            value={selectedClientFilter}
+            onValueChange={setSelectedClientFilter}
+          >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Filtrar por cliente" />
             </SelectTrigger>
@@ -374,110 +390,139 @@ export default function AdminTasks() {
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Nova Tarefa</DialogTitle>
-              <DialogDescription>
-                Crie uma nova tarefa para um cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="client">Cliente *</Label>
-                <Select 
-                  value={formData.client_id} 
-                  onValueChange={(v) => setFormData({ ...formData, client_id: v, assigned_to: '' })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Título *</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Ex: Criar campanha de remarketing"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Detalhes da tarefa..."
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <DialogHeader>
+                <DialogTitle>Nova Tarefa</DialogTitle>
+                <DialogDescription>
+                  Crie uma nova tarefa para um cliente.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="category">Categoria *</Label>
-                  <Select 
-                    value={formData.category} 
-                    onValueChange={(v) => setFormData({ ...formData, category: v as TaskCategory })}
+                  <Label htmlFor="client">Cliente *</Label>
+                  <Select
+                    value={formData.client_id}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, client_id: v, assigned_to: '' })
+                    }
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione um cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(categoryLabels).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>
-                          {label}
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="due_date">Data de Entrega</Label>
+                  <Label htmlFor="title">Título *</Label>
                   <Input
-                    id="due_date"
-                    type="date"
-                    value={formData.due_date}
-                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                    placeholder="Ex: Criar campanha de remarketing"
+                    required
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="assigned_to">Responsável</Label>
-                <Select 
-                  value={formData.assigned_to} 
-                  onValueChange={(v) => setFormData({ ...formData, assigned_to: v })}
-                  disabled={!formData.client_id}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={formData.client_id ? "Selecione um responsável" : "Selecione um cliente primeiro"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableUsersForForm.map((userProfile) => (
-                      <SelectItem key={userProfile.user_id} value={userProfile.user_id}>
-                        {userProfile.full_name || userProfile.email.split('@')[0]}
-                        {userProfile.user_id === user?.id && ' (você)'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={!formData.client_id || !formData.title}>
-                  Criar
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="Detalhes da tarefa..."
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Categoria *</Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, category: v as TaskCategory })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(categoryLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="due_date">Data de Entrega</Label>
+                    <Input
+                      id="due_date"
+                      type="date"
+                      value={formData.due_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, due_date: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_to">Responsável</Label>
+                  <Select
+                    value={formData.assigned_to}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, assigned_to: v })
+                    }
+                    disabled={!formData.client_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          formData.client_id
+                            ? 'Selecione um responsável'
+                            : 'Selecione um cliente primeiro'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUsersForForm.map((userProfile) => (
+                        <SelectItem
+                          key={userProfile.user_id}
+                          value={userProfile.user_id}
+                        >
+                          {userProfile.full_name ||
+                            userProfile.email.split('@')[0]}
+                          {userProfile.user_id === user?.id && ' (você)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={!formData.client_id || !formData.title}
+                  >
+                    Criar
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
           </Dialog>
         </div>
       </div>
@@ -499,73 +544,34 @@ export default function AdminTasks() {
         >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {columns.map((column) => (
-              <DroppableColumn
+              <TaskColumn
                 key={column.key}
                 status={column.key}
                 label={column.label}
                 tasks={getTasksByStatus(column.key)}
                 loading={loading}
                 getUserName={getUserName}
+                onTaskClick={handleTaskClick}
               />
             ))}
           </div>
           <DragOverlay>
-            {activeTask ? (
-              <TaskCardOverlay task={activeTask} getUserName={getUserName} />
-            ) : null}
+            {activeTask ? <TaskCardOverlay task={activeTask} /> : null}
           </DragOverlay>
         </DndContext>
       )}
-    </div>
-  );
-}
 
-interface DroppableColumnProps {
-  status: TaskStatus;
-  label: string;
-  tasks: Task[];
-  loading: boolean;
-  getUserName: (userId: string | null) => string | null;
-}
-
-function DroppableColumn({ status, label, tasks, loading, getUserName }: DroppableColumnProps) {
-  const { setNodeRef, isOver } = useSortable({
-    id: status,
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-foreground">{label}</h3>
-        <Badge variant="secondary" className="text-xs">
-          {tasks.length}
-        </Badge>
-      </div>
-      <div
-        ref={setNodeRef}
-        className={`space-y-3 min-h-[200px] p-3 rounded-lg border transition-colors ${
-          isOver
-            ? 'bg-primary/10 border-primary'
-            : 'bg-muted/30 border-border/50'
-        }`}
-      >
-        {loading ? (
-          <div className="animate-pulse space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-24 bg-muted rounded-lg" />
-            ))}
-          </div>
-        ) : (
-          tasks.map((task) => (
-            <DraggableTaskCard key={task.id} task={task} getUserName={getUserName} />
-          ))
-        )}
-        {!loading && tasks.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Nenhuma tarefa
-          </p>
-        )}
-      </div>
+      <TaskDetailSidebar
+        task={selectedTask}
+        open={isSidebarOpen}
+        onClose={() => {
+          setIsSidebarOpen(false);
+          setSelectedTask(null);
+        }}
+        onDelete={deleteTask}
+        isAdmin={true}
+        getUserName={getUserName}
+      />
     </div>
   );
 }
