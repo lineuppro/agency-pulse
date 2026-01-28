@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Plus, CalendarDays, FolderPlus, Filter } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, CalendarDays, FolderPlus, Filter, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
 import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
 
 export default function AdminCalendar() {
+  const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
   const [view, setView] = useState<'week' | 'month'>('month');
@@ -231,6 +233,15 @@ export default function AdminCalendar() {
           <Button variant="outline" onClick={() => setIsCampaignModalOpen(true)}>
             <FolderPlus className="h-4 w-4 mr-2" />
             Criar Campanha
+          </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/admin/content-creation')}
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Gerar com IA
           </Button>
 
           <Button onClick={() => { setEditingContent(null); setIsModalOpen(true); }}>

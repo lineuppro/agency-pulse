@@ -27,6 +27,7 @@ import AdminSettings from "./pages/admin/Settings";
 import AdminFiles from "./pages/admin/Files";
 import AdminMeetingAgenda from "./pages/admin/MeetingAgenda";
 import AdminCalendar from "./pages/admin/Calendar";
+import AdminContentCreation from "./pages/admin/ContentCreation";
 
 // Client Portal Pages
 import MeetingAgenda from "./pages/portal/MeetingAgenda";
@@ -66,6 +67,7 @@ const App = () => (
                 <Route path="performance" element={<AdminPerformance />} />
                 <Route path="files" element={<AdminFiles />} />
                 <Route path="calendar" element={<AdminCalendar />} />
+                <Route path="content-creation" element={<AdminContentCreation />} />
                 <Route path="agenda" element={<AdminMeetingAgenda />} />
                 <Route path="chat" element={<AdminChat />} />
                 <Route path="settings" element={<AdminSettings />} />

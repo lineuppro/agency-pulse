@@ -1,0 +1,241 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { 
+  Zap, 
+  FileText, 
+  Instagram, 
+  Layers, 
+  Play,
+  Settings2,
+  Sparkles,
+  Copy,
+  CheckCircle2,
+  Loader2
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { BlogArticleForm } from '@/components/content-creation/BlogArticleForm';
+import { SocialPostForm } from '@/components/content-creation/SocialPostForm';
+import { CarouselForm } from '@/components/content-creation/CarouselForm';
+import { StoriesReelsForm } from '@/components/content-creation/StoriesReelsForm';
+import { ContentPreview } from '@/components/content-creation/ContentPreview';
+import { ClientAISettingsModal } from '@/components/content-creation/ClientAISettingsModal';
+import { useAIGeneratedContent, type AIGeneratedContent, type AIContentType } from '@/hooks/useAIGeneratedContent';
+
+export default function ContentCreation() {
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<AIContentType>('blog_article');
+  const [generatedContent, setGeneratedContent] = useState<AIGeneratedContent | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { isGenerating, generateContent } = useAIGeneratedContent(selectedClientId || undefined);
+
+  const handleGenerate = async (input: {
+    topic: string;
+    main_keyword?: string;
+    target_word_count?: number;
+    additional_instructions?: string;
+  }) => {
+    if (!selectedClientId) return;
+
+    const content = await generateContent({
+      client_id: selectedClientId,
+      content_type: activeTab,
+      ...input,
+    });
+
+    if (content) {
+      setGeneratedContent(content);
+    }
+  };
+
+  const contentTypes = [
+    { id: 'blog_article' as const, label: 'Artigo Blog', icon: FileText, description: 'SEO otimizado' },
+    { id: 'social_post' as const, label: 'Post Feed', icon: Instagram, description: 'Instagram/Facebook' },
+    { id: 'carousel' as const, label: 'Carrossel', icon: Layers, description: 'Múltiplos slides' },
+    { id: 'stories' as const, label: 'Stories/Reels', icon: Play, description: 'Roteiro curto' },
+  ];
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Zap className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Criação de Conteúdo</h1>
+            <p className="text-muted-foreground">
+              Gere artigos e posts otimizados com IA
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Selecione o cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {selectedClientId && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Configurações de IA do cliente"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {!selectedClientId ? (
+        <Card className="flex-1 flex items-center justify-center">
+          <CardContent className="text-center py-12">
+            <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Selecione um cliente</h3>
+            <p className="text-muted-foreground">
+              Escolha um cliente acima para começar a gerar conteúdo com IA
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+          {/* Left Panel - Forms */}
+          <Card className="flex flex-col min-h-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Tipo de Conteúdo</CardTitle>
+              <CardDescription>
+                Escolha o formato e preencha as informações
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col min-h-0">
+              <Tabs 
+                value={activeTab} 
+                onValueChange={(v) => setActiveTab(v as AIContentType)} 
+                className="flex flex-col flex-1 min-h-0"
+              >
+                <TabsList className="grid grid-cols-4 mb-4">
+                  {contentTypes.map((type) => (
+                    <TabsTrigger 
+                      key={type.id} 
+                      value={type.id}
+                      className="flex flex-col gap-1 h-auto py-2"
+                    >
+                      <type.icon className="h-4 w-4" />
+                      <span className="text-xs">{type.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <TabsContent value="blog_article" className="mt-0 h-full">
+                    <BlogArticleForm 
+                      onGenerate={handleGenerate}
+                      isGenerating={isGenerating}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="social_post" className="mt-0 h-full">
+                    <SocialPostForm 
+                      onGenerate={handleGenerate}
+                      isGenerating={isGenerating}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="carousel" className="mt-0 h-full">
+                    <CarouselForm 
+                      onGenerate={handleGenerate}
+                      isGenerating={isGenerating}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="stories" className="mt-0 h-full">
+                    <StoriesReelsForm 
+                      onGenerate={handleGenerate}
+                      isGenerating={isGenerating}
+                    />
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Right Panel - Preview */}
+          <Card className="flex flex-col min-h-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Conteúdo Gerado
+              </CardTitle>
+              <CardDescription>
+                Visualize e edite o conteúdo antes de salvar
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto min-h-0">
+              {isGenerating ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-muted-foreground">Gerando conteúdo...</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Isso pode levar alguns segundos
+                    </p>
+                  </div>
+                </div>
+              ) : generatedContent ? (
+                <ContentPreview 
+                  content={generatedContent}
+                  onClear={() => setGeneratedContent(null)}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>O conteúdo gerado aparecerá aqui</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <ClientAISettingsModal
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        clientId={selectedClientId}
+      />
+    </div>
+  );
+}
