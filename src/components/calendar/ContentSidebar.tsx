@@ -15,7 +15,16 @@ import {
   Send,
   Trash2,
   Save,
-  FolderOpen
+  FolderOpen,
+  Sparkles,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  Target,
+  BookOpen,
+  Hash,
+  Image as ImageIcon,
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,9 +51,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import type { ContentType, ContentStatus, EditorialContent } from '@/hooks/useEditorialCalendar';
 import { getContentTypeLabel, getContentStatusLabel } from '@/hooks/useEditorialCalendar';
+import { useLinkedAIContent } from '@/hooks/useLinkedAIContent';
 
 interface ContentSidebarProps {
   open: boolean;
@@ -85,6 +102,21 @@ const statusConfig: Record<ContentStatus, { icon: typeof Clock; color: string; b
 const contentTypes: ContentType[] = ['instagram', 'facebook', 'blog', 'email', 'google_ads', 'other'];
 const statuses: ContentStatus[] = ['draft', 'pending_approval', 'approved', 'rejected', 'published'];
 
+// Helper to get SEO score color
+function getSEOScoreColor(score: number | null | undefined): string {
+  if (!score) return 'text-muted-foreground';
+  if (score >= 70) return 'text-emerald-600';
+  if (score >= 50) return 'text-amber-600';
+  return 'text-destructive';
+}
+
+function getSEOScoreLabel(score: number | null | undefined): string {
+  if (!score) return 'N/A';
+  if (score >= 70) return 'Excelente';
+  if (score >= 50) return 'Bom';
+  return 'Precisa melhorar';
+}
+
 export function ContentSidebar({
   open,
   onOpenChange,
@@ -102,6 +134,11 @@ export function ContentSidebar({
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
   const [status, setStatus] = useState<ContentStatus>('draft');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isAIContentOpen, setIsAIContentOpen] = useState(true);
+  const [isFullContentOpen, setIsFullContentOpen] = useState(false);
+
+  // Fetch linked AI content
+  const { data: aiContent, isLoading: isAIContentLoading } = useLinkedAIContent(content?.id);
 
   // Sync form state with content
   useEffect(() => {
@@ -153,10 +190,17 @@ export function ContentSidebar({
     }
   };
 
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado!`);
+  };
+
+  const hasAIContent = !!aiContent;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
-        <SheetHeader className="pb-4">
+      <SheetContent className="sm:max-w-lg p-0 flex flex-col h-full">
+        <SheetHeader className="px-6 py-4 border-b shrink-0">
           <div className="flex items-center gap-3">
             <div className={cn('p-2 rounded-lg', typeConfig.bgColor)}>
               <TypeIcon className={cn('h-5 w-5', typeConfig.color)} />
@@ -169,185 +213,386 @@ export function ContentSidebar({
                 {getContentTypeLabel(content.content_type)}
               </p>
             </div>
+            {hasAIContent && (
+              <Badge variant="secondary" className="gap-1">
+                <Sparkles className="h-3 w-3" />
+                Gerado por IA
+              </Badge>
+            )}
           </div>
         </SheetHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Campaign info */}
-          {campaignName && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Campanha: <span className="font-medium">{campaignName}</span></span>
-            </div>
-          )}
-
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Título</Label>
-            {isAdmin ? (
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título do conteúdo"
-              />
-            ) : (
-              <p className="text-sm py-2">{title}</p>
+        <ScrollArea className="flex-1">
+          <div className="px-6 py-4 space-y-6">
+            {/* Campaign info */}
+            {campaignName && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Campanha: <span className="font-medium">{campaignName}</span></span>
+              </div>
             )}
-          </div>
 
-          {/* Content Type */}
-          <div className="space-y-2">
-            <Label>Tipo de Conteúdo</Label>
-            {isAdmin ? (
-              <Select value={contentType} onValueChange={(v) => setContentType(v as ContentType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {contentTypes.map((type) => {
-                    const config = contentTypeConfig[type];
-                    const Icon = config.icon;
-                    return (
-                      <SelectItem key={type} value={type}>
-                        <div className="flex items-center gap-2">
-                          <Icon className={cn('h-4 w-4', config.color)} />
-                          {getContentTypeLabel(type)}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm py-2">{getContentTypeLabel(contentType)}</p>
-            )}
-          </div>
-
-          {/* Scheduled Date */}
-          <div className="space-y-2">
-            <Label>Data Programada</Label>
-            {isAdmin ? (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !scheduledDate && "text-muted-foreground"
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {scheduledDate ? format(scheduledDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Selecionar data'}
+            {/* AI Content Section - SEO Metrics */}
+            {hasAIContent && (
+              <Collapsible open={isAIContentOpen} onOpenChange={setIsAIContentOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Métricas de SEO</span>
+                    </div>
+                    {isAIContentOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={scheduledDate}
-                    onSelect={setScheduledDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <p className="text-sm py-2 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                {scheduledDate && format(scheduledDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </p>
-            )}
-          </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 space-y-4">
+                  {/* SEO Score Card */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium">Score de Legibilidade</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-2xl font-bold", getSEOScoreColor(aiContent?.readability_score))}>
+                          {aiContent?.readability_score || 'N/A'}
+                        </span>
+                        <Badge variant="outline" className={cn("text-xs", getSEOScoreColor(aiContent?.readability_score))}>
+                          {getSEOScoreLabel(aiContent?.readability_score)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Palavras:</span>
+                        <span className="font-medium">{aiContent?.word_count || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Hash className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Densidade:</span>
+                        <span className="font-medium">{aiContent?.keyword_density?.toFixed(1) || 0}%</span>
+                      </div>
+                    </div>
+                  </div>
 
-          {/* Status */}
-          <div className="space-y-2">
-            <Label>Status</Label>
-            {isAdmin ? (
-              <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map((s) => {
-                    const config = statusConfig[s];
-                    const Icon = config.icon;
-                    return (
-                      <SelectItem key={s} value={s}>
+                  {/* SEO Title */}
+                  {aiContent?.seo_title && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Título SEO</Label>
                         <div className="flex items-center gap-2">
-                          <Icon className={cn('h-4 w-4', config.color)} />
-                          {getContentStatusLabel(s)}
+                          <span className="text-xs text-muted-foreground">{aiContent.seo_title.length}/60</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(aiContent.seo_title!, 'Título SEO')}>
+                            <Copy className="h-3 w-3" />
+                          </Button>
                         </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="py-2">
-                <Badge variant="outline" className={cn(statusConfig[status].color)}>
-                  {React.createElement(statusConfig[status].icon, { className: 'h-3 w-3 mr-1' })}
-                  {getContentStatusLabel(status)}
-                </Badge>
+                      </div>
+                      <p className="text-sm p-2 rounded-md bg-muted/50">{aiContent.seo_title}</p>
+                    </div>
+                  )}
+
+                  {/* Meta Description */}
+                  {aiContent?.meta_description && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Meta Descrição</Label>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{aiContent.meta_description.length}/150</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(aiContent.meta_description!, 'Meta descrição')}>
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-sm p-2 rounded-md bg-muted/50">{aiContent.meta_description}</p>
+                    </div>
+                  )}
+
+                  {/* Main Keyword */}
+                  {aiContent?.main_keyword && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Palavra-chave Principal</Label>
+                      <Badge variant="outline">{aiContent.main_keyword}</Badge>
+                    </div>
+                  )}
+
+                  {/* Hashtags */}
+                  {aiContent?.hashtags && aiContent.hashtags.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Hashtags</Label>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => handleCopy(aiContent.hashtags!.join(' '), 'Hashtags')}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {aiContent.hashtags.map((tag, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {tag.startsWith('#') ? tag : `#${tag}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image Suggestions */}
+                  {aiContent?.image_suggestions && aiContent.image_suggestions.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <ImageIcon className="h-3 w-3" />
+                        Sugestões de Imagem
+                      </Label>
+                      <ul className="text-sm space-y-1 text-muted-foreground">
+                        {aiContent.image_suggestions.map((suggestion, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-primary">•</span>
+                            {suggestion}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Carousel Slides */}
+                  {aiContent?.slides && aiContent.slides.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Layers className="h-3 w-3" />
+                        Slides do Carrossel ({aiContent.slides.length})
+                      </Label>
+                      <div className="space-y-2">
+                        {aiContent.slides.map((slide, i) => (
+                          <div key={i} className="p-3 rounded-md bg-muted/50 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-primary">Slide {i + 1}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-5 w-5"
+                                onClick={() => handleCopy(`${slide.title}\n\n${slide.content}`, `Slide ${i + 1}`)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="text-sm font-medium">{slide.title}</p>
+                            <p className="text-xs text-muted-foreground">{slide.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Full Content (collapsible for AI content) */}
+            {hasAIContent && aiContent?.content && (
+              <>
+                <Separator />
+                <Collapsible open={isFullContentOpen} onOpenChange={setIsFullContentOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Conteúdo Completo</span>
+                      </div>
+                      {isFullContentOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-3">
+                    <div className="relative">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-2 right-2 h-6 w-6"
+                        onClick={() => handleCopy(aiContent.content!, 'Conteúdo')}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <div className="p-3 rounded-md bg-muted/50 max-h-[300px] overflow-y-auto">
+                        <p className="text-sm whitespace-pre-wrap pr-8">{aiContent.content}</p>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </>
+            )}
+
+            <Separator />
+
+            {/* Title */}
+            <div className="space-y-2">
+              <Label htmlFor="title">Título</Label>
+              {isAdmin ? (
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Título do conteúdo"
+                />
+              ) : (
+                <p className="text-sm py-2">{title}</p>
+              )}
+            </div>
+
+            {/* Content Type */}
+            <div className="space-y-2">
+              <Label>Tipo de Conteúdo</Label>
+              {isAdmin ? (
+                <Select value={contentType} onValueChange={(v) => setContentType(v as ContentType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contentTypes.map((type) => {
+                      const config = contentTypeConfig[type];
+                      const Icon = config.icon;
+                      return (
+                        <SelectItem key={type} value={type}>
+                          <div className="flex items-center gap-2">
+                            <Icon className={cn('h-4 w-4', config.color)} />
+                            {getContentTypeLabel(type)}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm py-2">{getContentTypeLabel(contentType)}</p>
+              )}
+            </div>
+
+            {/* Scheduled Date */}
+            <div className="space-y-2">
+              <Label>Data Programada</Label>
+              {isAdmin ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !scheduledDate && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {scheduledDate ? format(scheduledDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Selecionar data'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={scheduledDate}
+                      onSelect={setScheduledDate}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <p className="text-sm py-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  {scheduledDate && format(scheduledDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+              )}
+            </div>
+
+            {/* Status */}
+            <div className="space-y-2">
+              <Label>Status</Label>
+              {isAdmin ? (
+                <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statuses.map((s) => {
+                      const config = statusConfig[s];
+                      const Icon = config.icon;
+                      return (
+                        <SelectItem key={s} value={s}>
+                          <div className="flex items-center gap-2">
+                            <Icon className={cn('h-4 w-4', config.color)} />
+                            {getContentStatusLabel(s)}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="py-2">
+                  <Badge variant="outline" className={cn(statusConfig[status].color)}>
+                    {React.createElement(statusConfig[status].icon, { className: 'h-3 w-3 mr-1' })}
+                    {getContentStatusLabel(status)}
+                  </Badge>
+                </div>
+              )}
+            </div>
+
+            {/* Description (only if no AI content with full content) */}
+            {(!hasAIContent || !aiContent?.content) && (
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição</Label>
+                {isAdmin ? (
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Descrição ou observações sobre o conteúdo..."
+                    rows={4}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap py-2">
+                    {description || 'Sem descrição'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Created at info */}
+            <div className="text-xs text-muted-foreground">
+              Criado em {format(new Date(content.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            </div>
+
+            {/* Client actions for pending approval */}
+            {!isAdmin && content.status === 'pending_approval' && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 text-emerald-600 hover:text-emerald-700"
+                  onClick={() => {
+                    onStatusChange?.(content.id, 'approved');
+                    onOpenChange(false);
+                  }}
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Aprovar
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    onStatusChange?.(content.id, 'rejected');
+                    onOpenChange(false);
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Solicitar Alteração
+                </Button>
               </div>
             )}
           </div>
+        </ScrollArea>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            {isAdmin ? (
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descrição ou observações sobre o conteúdo..."
-                rows={4}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap py-2">
-                {description || 'Sem descrição'}
-              </p>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Created at info */}
-          <div className="text-xs text-muted-foreground">
-            Criado em {format(new Date(content.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-          </div>
-
-          {/* Client actions for pending approval */}
-          {!isAdmin && content.status === 'pending_approval' && (
+        {/* Admin actions - fixed at bottom */}
+        {isAdmin && (
+          <div className="border-t px-6 py-4 shrink-0">
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1 text-emerald-600 hover:text-emerald-700"
-                onClick={() => {
-                  onStatusChange?.(content.id, 'approved');
-                  onOpenChange(false);
-                }}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Aprovar
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={() => {
-                  onStatusChange?.(content.id, 'rejected');
-                  onOpenChange(false);
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Solicitar Alteração
-              </Button>
-            </div>
-          )}
-
-          {/* Admin actions */}
-          {isAdmin && (
-            <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleSave}
                 disabled={!hasChanges || isLoading || !title.trim()}
@@ -364,8 +609,8 @@ export function ContentSidebar({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
