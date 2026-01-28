@@ -111,7 +111,8 @@ export default function ContentCreation() {
     
     setIsPublishing(true);
     try {
-      const { error } = await supabase
+      // First insert into editorial_contents and get the ID
+      const { data: editorialContent, error } = await supabase
         .from('editorial_contents')
         .insert({
           client_id: generatedContent.client_id,
@@ -121,17 +122,23 @@ export default function ContentCreation() {
           scheduled_date: format(selectedDate, 'yyyy-MM-dd'),
           status: 'draft',
           created_by: user.id,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
-      // Link AI content to editorial content
+      // Link AI content to editorial content using editorial_content_id
       await supabase
         .from('ai_generated_contents')
-        .update({ status: 'linked' })
+        .update({ 
+          status: 'linked',
+          editorial_content_id: editorialContent.id 
+        })
         .eq('id', generatedContent.id);
 
       queryClient.invalidateQueries({ queryKey: ['editorial-contents'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-generated-contents'] });
       toast({ title: 'Conteúdo publicado no calendário!' });
       setIsCalendarModalOpen(false);
       setGeneratedContent(null);
