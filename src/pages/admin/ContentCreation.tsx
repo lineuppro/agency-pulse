@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Zap, 
   FileText, 
@@ -8,8 +8,6 @@ import {
   Play,
   Settings2,
   Sparkles,
-  Copy,
-  CheckCircle2,
   Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,6 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { BlogArticleForm } from '@/components/content-creation/BlogArticleForm';
 import { SocialPostForm } from '@/components/content-creation/SocialPostForm';
@@ -30,12 +38,22 @@ import { StoriesReelsForm } from '@/components/content-creation/StoriesReelsForm
 import { ContentPreview } from '@/components/content-creation/ContentPreview';
 import { ClientAISettingsModal } from '@/components/content-creation/ClientAISettingsModal';
 import { useAIGeneratedContent, type AIGeneratedContent, type AIContentType } from '@/hooks/useAIGeneratedContent';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function ContentCreation() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<AIContentType>('blog_article');
   const [generatedContent, setGeneratedContent] = useState<AIGeneratedContent | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
@@ -71,11 +89,59 @@ export default function ContentCreation() {
   };
 
   const contentTypes = [
-    { id: 'blog_article' as const, label: 'Artigo Blog', icon: FileText, description: 'SEO otimizado' },
-    { id: 'social_post' as const, label: 'Post Feed', icon: Instagram, description: 'Instagram/Facebook' },
-    { id: 'carousel' as const, label: 'Carrossel', icon: Layers, description: 'Múltiplos slides' },
-    { id: 'stories' as const, label: 'Stories/Reels', icon: Play, description: 'Roteiro curto' },
+    { id: 'blog_article' as const, label: 'Artigo Blog', icon: FileText },
+    { id: 'social_post' as const, label: 'Post Feed', icon: Instagram },
+    { id: 'carousel' as const, label: 'Carrossel', icon: Layers },
+    { id: 'stories' as const, label: 'Stories/Reels', icon: Play },
   ];
+
+  const getContentTypeForCalendar = (type: AIContentType) => {
+    switch (type) {
+      case 'blog_article': return 'blog';
+      case 'social_post': return 'instagram';
+      case 'carousel': return 'instagram';
+      case 'stories': return 'instagram';
+      case 'reels': return 'instagram';
+      default: return 'other';
+    }
+  };
+
+  const handlePublishToCalendar = async () => {
+    if (!generatedContent || !selectedDate || !user) return;
+    
+    setIsPublishing(true);
+    try {
+      const { error } = await supabase
+        .from('editorial_contents')
+        .insert({
+          client_id: generatedContent.client_id,
+          title: generatedContent.title || generatedContent.topic,
+          description: generatedContent.meta_description || generatedContent.content?.substring(0, 200) || '',
+          content_type: getContentTypeForCalendar(generatedContent.content_type) as 'instagram' | 'facebook' | 'blog' | 'email' | 'google_ads' | 'other',
+          scheduled_date: format(selectedDate, 'yyyy-MM-dd'),
+          status: 'draft',
+          created_by: user.id,
+        });
+
+      if (error) throw error;
+
+      // Link AI content to editorial content
+      await supabase
+        .from('ai_generated_contents')
+        .update({ status: 'linked' })
+        .eq('id', generatedContent.id);
+
+      queryClient.invalidateQueries({ queryKey: ['editorial-contents'] });
+      toast({ title: 'Conteúdo publicado no calendário!' });
+      setIsCalendarModalOpen(false);
+      setGeneratedContent(null);
+    } catch (error) {
+      console.error('Error publishing to calendar:', error);
+      toast({ title: 'Erro ao publicar no calendário', variant: 'destructive' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -145,15 +211,15 @@ export default function ContentCreation() {
                 onValueChange={(v) => setActiveTab(v as AIContentType)} 
                 className="flex flex-col flex-1 min-h-0"
               >
-                <TabsList className="grid grid-cols-4 mb-4">
+                <TabsList className="grid grid-cols-4 mb-4 h-auto p-1">
                   {contentTypes.map((type) => (
                     <TabsTrigger 
                       key={type.id} 
                       value={type.id}
-                      className="flex flex-col gap-1 h-auto py-2"
+                      className="flex items-center gap-2 py-2.5 px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                     >
                       <type.icon className="h-4 w-4" />
-                      <span className="text-xs">{type.label}</span>
+                      <span className="text-sm font-medium hidden sm:inline">{type.label}</span>
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -217,6 +283,7 @@ export default function ContentCreation() {
                 <ContentPreview 
                   content={generatedContent}
                   onClear={() => setGeneratedContent(null)}
+                  onPublishToCalendar={() => setIsCalendarModalOpen(true)}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -236,6 +303,42 @@ export default function ContentCreation() {
         onOpenChange={setIsSettingsOpen}
         clientId={selectedClientId}
       />
+
+      <Dialog open={isCalendarModalOpen} onOpenChange={setIsCalendarModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Publicar no Calendário</DialogTitle>
+            <DialogDescription>
+              Selecione a data para publicar o conteúdo no calendário editorial.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center py-4">
+            <Label className="mb-2 text-sm text-muted-foreground">Data de Publicação</Label>
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              locale={ptBR}
+              className="rounded-md border"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCalendarModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handlePublishToCalendar} disabled={!selectedDate || isPublishing}>
+              {isPublishing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Publicando...
+                </>
+              ) : (
+                'Publicar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

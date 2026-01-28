@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { Copy, Check, Trash2, FileText, Hash, Image, Layers } from 'lucide-react';
+import { Copy, Check, Trash2, FileText, Hash, Image, Layers, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { type AIGeneratedContent } from '@/hooks/useAIGeneratedContent';
 
 interface ContentPreviewProps {
   content: AIGeneratedContent;
   onClear: () => void;
+  onPublishToCalendar?: () => void;
 }
 
-export function ContentPreview({ content, onClear }: ContentPreviewProps) {
+export function ContentPreview({ content, onClear, onPublishToCalendar }: ContentPreviewProps) {
   const { toast } = useToast();
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -336,6 +336,19 @@ export function ContentPreview({ content, onClear }: ContentPreviewProps) {
       {content.content_type === 'social_post' && renderSocialPost()}
       {content.content_type === 'carousel' && renderCarousel()}
       {(content.content_type === 'stories' || content.content_type === 'reels') && renderStoriesReels()}
+
+      <Separator className="my-4" />
+
+      {onPublishToCalendar && (
+        <Button 
+          onClick={onPublishToCalendar} 
+          className="w-full gap-2"
+          variant="default"
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Publicar no Calendário Editorial
+        </Button>
+      )}
     </div>
   );
 }
