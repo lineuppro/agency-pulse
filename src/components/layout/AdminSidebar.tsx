@@ -40,6 +40,7 @@ const menuItems = [
   { title: 'Performance', url: '/admin/performance', icon: BarChart3 },
   { title: 'Arquivos', url: '/admin/files', icon: FolderOpen },
   { title: 'Calendário Editorial', url: '/admin/calendar', icon: CalendarDays },
+  { title: 'Criação de Conteúdo', url: '/admin/content-creation', icon: Zap },
   { title: 'Pauta de Reunião', url: '/admin/agenda', icon: FileText },
   { title: 'Chat IA', url: '/admin/chat', icon: MessageSquare },
   { title: 'Configurações', url: '/admin/settings', icon: Settings },

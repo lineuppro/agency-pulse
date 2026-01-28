@@ -251,8 +251,8 @@ export function TaskDetailSidebar({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="comments" className="flex-1 flex flex-col overflow-hidden mt-0 px-6 data-[state=active]:flex">
-            <div className="flex-1 overflow-y-auto py-4 space-y-4">
+          <TabsContent value="comments" className="flex-1 flex flex-col mt-0 px-6 data-[state=active]:flex min-h-0">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3 min-h-0">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2].map((i) => (
@@ -267,9 +267,9 @@ export function TaskDetailSidebar({
                 comments.map((comment) => (
                   <div
                     key={comment.id}
-                    className="bg-muted/50 rounded-lg p-3 space-y-1"
+                    className="bg-muted/50 rounded-lg p-3"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium">
                         {comment.user_name}
                       </span>
@@ -279,7 +279,7 @@ export function TaskDetailSidebar({
                         })}
                       </span>
                     </div>
-                    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                    <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
                       {comment.content}
                     </p>
                   </div>
@@ -287,20 +287,20 @@ export function TaskDetailSidebar({
               )}
             </div>
 
-            <div className="shrink-0 py-4 border-t">
-              <div className="flex gap-2 items-end">
+            <div className="shrink-0 py-4 border-t bg-background">
+              <div className="flex gap-2">
                 <Textarea
                   placeholder="Escreva um comentário..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  rows={3}
-                  className="resize-none min-h-[80px]"
+                  rows={2}
+                  className="resize-none flex-1"
                 />
                 <Button
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
                   size="icon"
-                  className="shrink-0 h-10 w-10"
+                  className="shrink-0 h-10 w-10 self-end"
                 >
                   <Send className="h-4 w-4" />
                 </Button>

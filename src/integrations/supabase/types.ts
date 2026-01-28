@@ -14,6 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generated_contents: {
+        Row: {
+          additional_instructions: string | null
+          client_id: string
+          content: string | null
+          content_type: string
+          created_at: string
+          created_by: string
+          editorial_content_id: string | null
+          hashtags: string[] | null
+          id: string
+          image_suggestions: string[] | null
+          keyword_density: number | null
+          main_keyword: string | null
+          meta_description: string | null
+          readability_score: number | null
+          seo_title: string | null
+          slides: Json | null
+          status: string
+          target_word_count: number | null
+          title: string | null
+          topic: string
+          updated_at: string
+          version: number | null
+          word_count: number | null
+        }
+        Insert: {
+          additional_instructions?: string | null
+          client_id: string
+          content?: string | null
+          content_type: string
+          created_at?: string
+          created_by: string
+          editorial_content_id?: string | null
+          hashtags?: string[] | null
+          id?: string
+          image_suggestions?: string[] | null
+          keyword_density?: number | null
+          main_keyword?: string | null
+          meta_description?: string | null
+          readability_score?: number | null
+          seo_title?: string | null
+          slides?: Json | null
+          status?: string
+          target_word_count?: number | null
+          title?: string | null
+          topic: string
+          updated_at?: string
+          version?: number | null
+          word_count?: number | null
+        }
+        Update: {
+          additional_instructions?: string | null
+          client_id?: string
+          content?: string | null
+          content_type?: string
+          created_at?: string
+          created_by?: string
+          editorial_content_id?: string | null
+          hashtags?: string[] | null
+          id?: string
+          image_suggestions?: string[] | null
+          keyword_density?: number | null
+          main_keyword?: string | null
+          meta_description?: string | null
+          readability_score?: number | null
+          seo_title?: string | null
+          slides?: Json | null
+          status?: string
+          target_word_count?: number | null
+          title?: string | null
+          topic?: string
+          updated_at?: string
+          version?: number | null
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generated_contents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generated_contents_editorial_content_id_fkey"
+            columns: ["editorial_content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
@@ -81,6 +174,53 @@ export type Database = {
           },
         ]
       }
+      client_ai_settings: {
+        Row: {
+          brand_keywords: string[] | null
+          brand_voice: string | null
+          client_id: string
+          content_guidelines: string | null
+          created_at: string
+          custom_prompt: string | null
+          default_word_count: number | null
+          id: string
+          target_audience: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand_keywords?: string[] | null
+          brand_voice?: string | null
+          client_id: string
+          content_guidelines?: string | null
+          created_at?: string
+          custom_prompt?: string | null
+          default_word_count?: number | null
+          id?: string
+          target_audience?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand_keywords?: string[] | null
+          brand_voice?: string | null
+          client_id?: string
+          content_guidelines?: string | null
+          created_at?: string
+          custom_prompt?: string | null
+          default_word_count?: number | null
+          id?: string
+          target_audience?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_ai_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string
@@ -110,6 +250,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      content_references: {
+        Row: {
+          client_id: string | null
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string
+          id: string
+          is_global: boolean | null
+          notes: string | null
+          title: string
+        }
+        Insert: {
+          client_id?: string | null
+          content: string
+          content_type: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_global?: boolean | null
+          notes?: string | null
+          title: string
+        }
+        Update: {
+          client_id?: string | null
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_global?: boolean | null
+          notes?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_references_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       documents_knowledge: {
         Row: {
