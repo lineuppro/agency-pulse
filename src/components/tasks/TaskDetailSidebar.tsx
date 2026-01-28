@@ -183,8 +183,8 @@ export function TaskDetailSidebar({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-lg w-full flex flex-col p-0">
-        <SheetHeader className="p-6 pb-4">
+      <SheetContent className="sm:max-w-lg w-full flex flex-col h-full overflow-hidden p-0">
+        <SheetHeader className="shrink-0 p-6 pb-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-lg font-semibold text-foreground text-left">
@@ -227,212 +227,214 @@ export function TaskDetailSidebar({
           )}
         </SheetHeader>
 
-        <Separator />
+        <Separator className="shrink-0" />
 
-        <Tabs defaultValue="comments" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="mx-6 mt-4 grid w-auto grid-cols-3">
-            <TabsTrigger value="comments" className="gap-1">
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Comentários</span>
-              {comments.length > 0 && (
-                <span className="text-xs">({comments.length})</span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="attachments" className="gap-1">
-              <Paperclip className="h-4 w-4" />
-              <span className="hidden sm:inline">Anexos</span>
-              {attachments.length > 0 && (
-                <span className="text-xs">({attachments.length})</span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-1">
-              <History className="h-4 w-4" />
-              <span className="hidden sm:inline">Histórico</span>
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <Tabs defaultValue="comments" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <TabsList className="shrink-0 mx-6 mt-4 grid w-auto grid-cols-3">
+              <TabsTrigger value="comments" className="gap-1">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Comentários</span>
+                {comments.length > 0 && (
+                  <span className="text-xs">({comments.length})</span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="attachments" className="gap-1">
+                <Paperclip className="h-4 w-4" />
+                <span className="hidden sm:inline">Anexos</span>
+                {attachments.length > 0 && (
+                  <span className="text-xs">({attachments.length})</span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Histórico</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="comments" className="flex-1 flex flex-col mt-0 px-6 data-[state=active]:flex min-h-0">
-            <div className="flex-1 overflow-y-auto py-4 space-y-3 min-h-0">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="animate-pulse h-16 bg-muted rounded-lg" />
-                  ))}
-                </div>
-              ) : comments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhum comentário ainda
-                </p>
-              ) : (
-                comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="bg-muted/50 rounded-lg p-3"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium">
-                        {comment.user_name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(comment.created_at), "dd/MM/yy 'às' HH:mm", {
-                          locale: ptBR,
-                        })}
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                      {comment.content}
-                    </p>
+            <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 px-6 data-[state=active]:flex">
+              <div className="flex-1 overflow-y-auto py-4 space-y-3">
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="animate-pulse h-16 bg-muted rounded-lg" />
+                    ))}
                   </div>
-                ))
-              )}
-            </div>
-
-            <div className="shrink-0 py-4 border-t bg-background">
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Escreva um comentário..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={2}
-                  className="resize-none flex-1"
-                />
-                <Button
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim()}
-                  size="icon"
-                  className="shrink-0 h-10 w-10 self-end"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="attachments" className="flex-1 flex flex-col min-h-0 mt-0 px-6 data-[state=active]:flex">
-            <div className="flex-1 overflow-auto mt-4">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="animate-pulse h-12 bg-muted rounded-lg" />
-                  ))}
-                </div>
-              ) : attachments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhum anexo ainda
-                </p>
-              ) : (
-                <div className="space-y-2 pb-4">
-                  {attachments.map((attachment) => (
+                ) : comments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum comentário ainda
+                  </p>
+                ) : (
+                  comments.map((comment) => (
                     <div
-                      key={attachment.id}
-                      className="flex items-center gap-3 bg-muted/50 rounded-lg p-3"
+                      key={comment.id}
+                      className="bg-muted/50 rounded-lg p-3"
                     >
-                      {getFileIcon(attachment.file_type)}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {attachment.file_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {attachment.user_name} •{' '}
-                          {formatFileSize(attachment.file_size)}
-                        </p>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">
+                          {comment.user_name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(comment.created_at), "dd/MM/yy 'às' HH:mm", {
+                            locale: ptBR,
+                          })}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() =>
-                            handleDownload(attachment.file_path, attachment.file_name)
-                          }
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        {isAdmin && (
+                      <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                        {comment.content}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="shrink-0 py-4 border-t bg-background">
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    placeholder="Escreva um comentário..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={2}
+                    className="resize-none flex-1 min-h-[60px]"
+                  />
+                  <Button
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim()}
+                    size="icon"
+                    className="shrink-0 h-10 w-10"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="attachments" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 px-6 data-[state=active]:flex">
+              <div className="flex-1 overflow-y-auto py-4">
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="animate-pulse h-12 bg-muted rounded-lg" />
+                    ))}
+                  </div>
+                ) : attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum anexo ainda
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center gap-3 bg-muted/50 rounded-lg p-3"
+                      >
+                        {getFileIcon(attachment.file_type)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {attachment.file_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {attachment.user_name} •{' '}
+                            {formatFileSize(attachment.file_size)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            className="h-8 w-8"
                             onClick={() =>
-                              deleteAttachment(attachment.id, attachment.file_path)
+                              handleDownload(attachment.file_path, attachment.file_name)
                             }
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Download className="h-4 w-4" />
                           </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="py-4 border-t mt-auto">
-              <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileSelect}
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
-                className="hidden"
-              />
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="h-4 w-4" />
-                Anexar arquivo
-              </Button>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="history" className="flex-1 flex flex-col min-h-0 mt-0 px-6 data-[state=active]:flex">
-            <div className="flex-1 overflow-auto mt-4">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse h-10 bg-muted rounded-lg" />
-                  ))}
-                </div>
-              ) : activityLog.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhuma atividade registrada
-                </p>
-              ) : (
-                <div className="space-y-3 pb-4">
-                  {activityLog.map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="flex items-start gap-3 text-sm"
-                    >
-                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <History className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p>
-                          <span className="font-medium">{activity.user_name}</span>{' '}
-                          <span className="text-muted-foreground">
-                            {actionLabels[activity.action] || activity.action}
-                          </span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(
-                            new Date(activity.created_at),
-                            "dd 'de' MMMM 'às' HH:mm",
-                            { locale: ptBR }
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() =>
+                                deleteAttachment(attachment.id, attachment.file_path)
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
-                        </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="shrink-0 py-4 border-t bg-background">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileSelect}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Anexar arquivo
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="history" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 px-6 data-[state=active]:flex">
+              <div className="flex-1 overflow-y-auto py-4">
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse h-10 bg-muted rounded-lg" />
+                    ))}
+                  </div>
+                ) : activityLog.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma atividade registrada
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {activityLog.map((activity) => (
+                      <div
+                        key={activity.id}
+                        className="flex items-start gap-3 text-sm"
+                      >
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                          <History className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p>
+                            <span className="font-medium">{activity.user_name}</span>{' '}
+                            <span className="text-muted-foreground">
+                              {actionLabels[activity.action] || activity.action}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(
+                              new Date(activity.created_at),
+                              "dd 'de' MMMM 'às' HH:mm",
+                              { locale: ptBR }
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
 
         {isAdmin && onDelete && (
-          <div className="p-6 pt-0 border-t">
+          <div className="shrink-0 p-6 pt-4 border-t bg-background">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
