@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -183,7 +184,8 @@ export function TaskDetailSidebar({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-lg w-full flex flex-col h-full overflow-hidden p-0">
+      {/* Use dvh to ensure proper scrolling on mobile sheets */}
+      <SheetContent className="sm:max-w-lg w-full flex flex-col h-[100dvh] overflow-hidden p-0">
         <SheetHeader className="shrink-0 p-6 pb-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
@@ -253,7 +255,8 @@ export function TaskDetailSidebar({
             </TabsList>
 
             <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 px-6 data-[state=active]:flex">
-              <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <ScrollArea className="flex-1">
+                <div className="py-4 space-y-3">
                 {loading ? (
                   <div className="space-y-3">
                     {[1, 2].map((i) => (
@@ -286,7 +289,8 @@ export function TaskDetailSidebar({
                     </div>
                   ))
                 )}
-              </div>
+                </div>
+              </ScrollArea>
 
               <div className="shrink-0 py-4 border-t bg-background">
                 <div className="flex gap-2 items-end">
@@ -294,8 +298,7 @@ export function TaskDetailSidebar({
                     placeholder="Escreva um comentário..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    rows={2}
-                    className="resize-none flex-1 min-h-[60px]"
+                    className="resize-none flex-1 min-h-[96px]"
                   />
                   <Button
                     onClick={handleAddComment}
@@ -310,7 +313,8 @@ export function TaskDetailSidebar({
             </TabsContent>
 
             <TabsContent value="attachments" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 px-6 data-[state=active]:flex">
-              <div className="flex-1 overflow-y-auto py-4">
+              <ScrollArea className="flex-1">
+                <div className="py-4">
                 {loading ? (
                   <div className="space-y-3">
                     {[1, 2].map((i) => (
@@ -366,7 +370,8 @@ export function TaskDetailSidebar({
                     ))}
                   </div>
                 )}
-              </div>
+                </div>
+              </ScrollArea>
 
               <div className="shrink-0 py-4 border-t bg-background">
                 <input
@@ -388,7 +393,8 @@ export function TaskDetailSidebar({
             </TabsContent>
 
             <TabsContent value="history" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 px-6 data-[state=active]:flex">
-              <div className="flex-1 overflow-y-auto py-4">
+              <ScrollArea className="flex-1">
+                <div className="py-4">
                 {loading ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
@@ -428,7 +434,8 @@ export function TaskDetailSidebar({
                     ))}
                   </div>
                 )}
-              </div>
+                </div>
+              </ScrollArea>
             </TabsContent>
           </Tabs>
         </div>
