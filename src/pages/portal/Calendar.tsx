@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, List, LayoutGrid } from 'lucide-react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarView } from '@/components/calendar/CalendarView';
+import { ContentListView } from '@/components/calendar/ContentListView';
 import { ContentSidebar } from '@/components/calendar/ContentSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -14,6 +16,7 @@ import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
 export default function PortalCalendar() {
   const { clientId } = useAuth();
   const [view, setView] = useState<'week' | 'month'>('month');
+  const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('calendar');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [viewingContent, setViewingContent] = useState<EditorialContent | null>(null);
@@ -87,19 +90,37 @@ export default function PortalCalendar() {
             <span className="font-medium">{pendingCount}</span> conteúdo(s) aguardando aprovação
           </div>
         )}
+
+        <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'calendar' | 'list')}>
+          <TabsList className="h-9">
+            <TabsTrigger value="calendar" className="px-3">
+              <LayoutGrid className="h-4 w-4" />
+            </TabsTrigger>
+            <TabsTrigger value="list" className="px-3">
+              <List className="h-4 w-4" />
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="flex-1 min-h-0">
-        <CalendarView
-          contents={contents}
-          view={view}
-          onViewChange={setView}
-          currentDate={currentDate}
-          onDateChange={setCurrentDate}
-          isAdmin={false}
-          onContentClick={handleContentClick}
-          onStatusChange={handleStatusChange}
-        />
+        {displayMode === 'calendar' ? (
+          <CalendarView
+            contents={contents}
+            view={view}
+            onViewChange={setView}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            isAdmin={false}
+            onContentClick={handleContentClick}
+            onStatusChange={handleStatusChange}
+          />
+        ) : (
+          <ContentListView 
+            contents={contents} 
+            isAdmin={false}
+          />
+        )}
       </div>
 
       <ContentSidebar

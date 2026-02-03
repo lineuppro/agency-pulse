@@ -33,6 +33,7 @@ export type Database = {
           seo_title: string | null
           slides: Json | null
           status: string
+          subtitle: string | null
           target_word_count: number | null
           title: string | null
           topic: string
@@ -58,6 +59,7 @@ export type Database = {
           seo_title?: string | null
           slides?: Json | null
           status?: string
+          subtitle?: string | null
           target_word_count?: number | null
           title?: string | null
           topic: string
@@ -83,6 +85,7 @@ export type Database = {
           seo_title?: string | null
           slides?: Json | null
           status?: string
+          subtitle?: string | null
           target_word_count?: number | null
           title?: string | null
           topic?: string
@@ -385,6 +388,83 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorial_content_comments: {
+        Row: {
+          content: string
+          created_at: string
+          editorial_content_id: string
+          id: string
+          parent_comment_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          editorial_content_id: string
+          id?: string
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          editorial_content_id?: string
+          id?: string
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_content_comments_editorial_content_id_fkey"
+            columns: ["editorial_content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "editorial_content_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_content_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorial_content_reactions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          reaction_type: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_content_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_content_comments"
             referencedColumns: ["id"]
           },
         ]

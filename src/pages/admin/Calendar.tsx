@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, CalendarDays, FolderPlus, Filter, Sparkles } from 'lucide-react';
+import { Plus, CalendarDays, FolderPlus, Filter, Sparkles, List, LayoutGrid } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarView } from '@/components/calendar/CalendarView';
+import { ContentListView } from '@/components/calendar/ContentListView';
 import { ContentModal } from '@/components/calendar/ContentModal';
 import { ContentSidebar } from '@/components/calendar/ContentSidebar';
 import { CampaignModal } from '@/components/calendar/CampaignModal';
@@ -29,6 +31,7 @@ export default function AdminCalendar() {
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
   const [view, setView] = useState<'week' | 'month'>('month');
+  const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('calendar');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
@@ -244,6 +247,17 @@ export default function AdminCalendar() {
             Gerar com IA
           </Button>
 
+          <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'calendar' | 'list')}>
+            <TabsList className="h-9">
+              <TabsTrigger value="calendar" className="px-3">
+                <LayoutGrid className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger value="list" className="px-3">
+                <List className="h-4 w-4" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <Button onClick={() => { setEditingContent(null); setIsModalOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Conteúdo
@@ -252,18 +266,25 @@ export default function AdminCalendar() {
       </div>
 
       <div className="flex-1 min-h-0">
-        <CalendarView
-          contents={contents}
-          view={view}
-          onViewChange={setView}
-          currentDate={currentDate}
-          onDateChange={setCurrentDate}
-          isAdmin={true}
-          onContentClick={handleContentClick}
-          onContentEdit={handleEditContent}
-          onContentDelete={handleDeleteContent}
-          onStatusChange={handleStatusChange}
-        />
+        {displayMode === 'calendar' ? (
+          <CalendarView
+            contents={contents}
+            view={view}
+            onViewChange={setView}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            isAdmin={true}
+            onContentClick={handleContentClick}
+            onContentEdit={handleEditContent}
+            onContentDelete={handleDeleteContent}
+            onStatusChange={handleStatusChange}
+          />
+        ) : (
+          <ContentListView 
+            contents={contents} 
+            isAdmin={true}
+          />
+        )}
       </div>
 
       <ContentModal

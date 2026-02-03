@@ -173,7 +173,8 @@ ${clientContext}
 
 FORMATO DE RESPOSTA (JSON):
 {
-  "title": "Título do post",
+  "title": "Título do post (chamativo, curto)",
+  "subtitle": "Subtítulo complementar para o designer usar no visual",
   "content": "Legenda completa com emojis e quebras de linha",
   "hashtags": ["hashtag1", "hashtag2", "..."],
   "image_suggestions": ["Descrição detalhada para o designer criar a imagem"]
@@ -194,6 +195,7 @@ ${clientContext}
 FORMATO DE RESPOSTA (JSON):
 {
   "title": "Título do carrossel (capa)",
+  "subtitle": "Subtítulo para complementar a capa",
   "content": "Descrição/legenda do post",
   "hashtags": ["hashtag1", "hashtag2", "..."],
   "slides": [
