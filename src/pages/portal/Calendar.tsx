@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CalendarDays, List, LayoutGrid } from 'lucide-react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +15,7 @@ import {
 import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
 
 export default function PortalCalendar() {
+  const navigate = useNavigate();
   const { clientId } = useAuth();
   const [view, setView] = useState<'week' | 'month'>('month');
   const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('calendar');
@@ -59,8 +61,7 @@ export default function PortalCalendar() {
   };
 
   const handleContentClick = (content: EditorialContent) => {
-    setViewingContent(content);
-    setIsSidebarOpen(true);
+    navigate(`/portal/calendar/${content.id}`);
   };
 
   const handleStatusChange = (id: string, status: ContentStatus) => {
@@ -72,24 +73,28 @@ export default function PortalCalendar() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Title Row */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <CalendarDays className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">Calendário Editorial</h1>
+          <p className="text-muted-foreground">
+            Visualize e aprove os conteúdos programados
+          </p>
+        </div>
+      </div>
+
+      {/* Filters and Actions Row */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <CalendarDays className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Calendário Editorial</h1>
-            <p className="text-muted-foreground">
-              Visualize e aprove os conteúdos programados
-            </p>
-          </div>
+          {pendingCount > 0 && (
+            <div className="px-4 py-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+              <span className="font-medium">{pendingCount}</span> conteúdo(s) aguardando aprovação
+            </div>
+          )}
         </div>
-
-        {pendingCount > 0 && (
-          <div className="px-4 py-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-            <span className="font-medium">{pendingCount}</span> conteúdo(s) aguardando aprovação
-          </div>
-        )}
 
         <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'calendar' | 'list')}>
           <TabsList className="h-9">
