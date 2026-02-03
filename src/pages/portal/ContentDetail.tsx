@@ -263,9 +263,10 @@ export default function PortalContentDetail() {
               {hasAIContent && aiContent?.title ? (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">Título (Gerado por IA)</Label>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.title!, 'Título')}>
-                      <Copy className="h-3 w-3" />
+                    <Label className="text-xs text-muted-foreground">Título</Label>
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => handleCopy(aiContent.title!, 'Título')}>
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copiar
                     </Button>
                   </div>
                   <p className="font-medium p-3 rounded-md bg-muted/50">{aiContent.title}</p>
@@ -281,12 +282,17 @@ export default function PortalContentDetail() {
               {hasAIContent && (content.content_type === 'instagram' || content.content_type === 'facebook') && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">Subtítulo para Designer</Label>
-                    {aiContent?.subtitle && (
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.subtitle!, 'Subtítulo')}>
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    )}
+                    <Label className="text-xs text-muted-foreground">Subtítulo</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2" 
+                      onClick={() => handleCopy(aiContent?.subtitle || '', 'Subtítulo')}
+                      disabled={!aiContent?.subtitle}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copiar
+                    </Button>
                   </div>
                   <p className="text-sm p-3 rounded-md bg-muted/50">
                     {aiContent?.subtitle || <span className="text-muted-foreground italic">Não gerado (conteúdo anterior à funcionalidade)</span>}

@@ -527,9 +527,10 @@ export default function AdminContentDetail() {
               {hasAIContent && aiContent?.title ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs">Título (Gerado por IA)</Label>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.title!, 'Título')}>
-                      <Copy className="h-3 w-3" />
+                    <Label className="text-xs">Título</Label>
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => handleCopy(aiContent.title!, 'Título')}>
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copiar
                     </Button>
                   </div>
                   <div className="p-3 rounded-md bg-muted/50 text-sm font-medium">
@@ -547,12 +548,17 @@ export default function AdminContentDetail() {
               {hasAIContent && (content.content_type === 'instagram' || content.content_type === 'facebook') && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs">Subtítulo para Designer</Label>
-                    {aiContent?.subtitle && (
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.subtitle!, 'Subtítulo')}>
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    )}
+                    <Label className="text-xs">Subtítulo</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2" 
+                      onClick={() => handleCopy(aiContent?.subtitle || '', 'Subtítulo')}
+                      disabled={!aiContent?.subtitle}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copiar
+                    </Button>
                   </div>
                   <div className="p-3 rounded-md bg-muted/50 text-sm">
                     {aiContent?.subtitle || <span className="text-muted-foreground italic">Não gerado (conteúdo anterior à funcionalidade)</span>}
