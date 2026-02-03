@@ -452,22 +452,6 @@ export default function AdminContentDetail() {
                   </div>
                 )}
 
-                {/* Subtitle for social posts - always show for instagram/facebook/carousel */}
-                {(content.content_type === 'instagram' || content.content_type === 'facebook') && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Subtítulo (Designer)</Label>
-                      {aiContent?.subtitle && (
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.subtitle!, 'Subtítulo')}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-sm p-2 rounded-md bg-muted/50">
-                      {aiContent?.subtitle || <span className="text-muted-foreground italic">Não gerado (conteúdo anterior à funcionalidade)</span>}
-                    </p>
-                  </div>
-                )}
 
                 {aiContent?.seo_title && (
                   <div className="space-y-1">
@@ -539,17 +523,50 @@ export default function AdminContentDetail() {
               <CardTitle className="text-sm">Conteúdo</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs">Título</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-              </div>
+              {/* AI Generated Title */}
+              {hasAIContent && aiContent?.title ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Título (Gerado por IA)</Label>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.title!, 'Título')}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="p-3 rounded-md bg-muted/50 text-sm font-medium">
+                    {aiContent.title}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="text-xs">Título</Label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                </div>
+              )}
+
+              {/* AI Generated Subtitle for social posts */}
+              {hasAIContent && (content.content_type === 'instagram' || content.content_type === 'facebook') && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Subtítulo para Designer</Label>
+                    {aiContent?.subtitle && (
+                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(aiContent.subtitle!, 'Subtítulo')}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="p-3 rounded-md bg-muted/50 text-sm">
+                    {aiContent?.subtitle || <span className="text-muted-foreground italic">Não gerado (conteúdo anterior à funcionalidade)</span>}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
-                <Label className="text-xs">Descrição</Label>
+                <Label className="text-xs">Tema/Briefing</Label>
                 <Textarea 
                   value={description} 
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
+                  placeholder="Tema ou briefing do conteúdo..."
                 />
               </div>
 
