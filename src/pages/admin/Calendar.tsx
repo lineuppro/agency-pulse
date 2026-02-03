@@ -155,8 +155,7 @@ export default function AdminCalendar() {
   };
 
   const handleContentClick = (content: EditorialContent) => {
-    setViewingContent(content);
-    setIsSidebarOpen(true);
+    navigate(`/admin/calendar/${content.id}`);
   };
 
   const handleDeleteContent = (id: string) => {
@@ -188,19 +187,21 @@ export default function AdminCalendar() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <CalendarDays className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Calendário Editorial</h1>
-            <p className="text-muted-foreground">
-              Gerencie os conteúdos programados
-            </p>
-          </div>
+      {/* Title Row */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <CalendarDays className="h-6 w-6 text-primary" />
         </div>
+        <div>
+          <h1 className="text-2xl font-bold">Calendário Editorial</h1>
+          <p className="text-muted-foreground">
+            Gerencie os conteúdos programados
+          </p>
+        </div>
+      </div>
 
+      {/* Filters and Actions Row */}
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Select value={selectedClientId} onValueChange={handleClientChange}>
             <SelectTrigger className="w-[200px]">
@@ -232,7 +233,9 @@ export default function AdminCalendar() {
               </SelectContent>
             </Select>
           )}
+        </div>
 
+        <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => setIsCampaignModalOpen(true)}>
             <FolderPlus className="h-4 w-4 mr-2" />
             Criar Campanha
