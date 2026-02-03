@@ -23,6 +23,7 @@ export interface AIGeneratedContent {
   target_word_count: number | null;
   additional_instructions: string | null;
   title: string | null;
+  subtitle: string | null;
   seo_title: string | null;
   meta_description: string | null;
   content: string | null;
@@ -100,6 +101,7 @@ export function useAIGeneratedContent(clientId?: string) {
         target_word_count: input.target_word_count || null,
         additional_instructions: input.additional_instructions || null,
         title: data.title || null,
+        subtitle: data.subtitle || null,
         seo_title: data.seo_title || null,
         meta_description: data.meta_description || null,
         content: data.content || null,
