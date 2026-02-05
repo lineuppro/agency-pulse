@@ -108,13 +108,17 @@ export default function AdminPerformance() {
     loadClients();
   }, []);
 
+  // Fetch Google Ads data independently
   useEffect(() => {
-    if (selectedClientId) {
-      if (activeTab === 'google') {
-        fetchDetailedData(selectedClientId, dateRange);
-      } else {
-        fetchMetaMetrics(selectedClientId, dateRange as MetaDateRange);
-      }
+    if (selectedClientId && activeTab === 'google') {
+      fetchDetailedData(selectedClientId, dateRange);
+    }
+  }, [selectedClientId, dateRange, activeTab]);
+
+  // Fetch Meta Ads data independently (separate effect to avoid conflicts)
+  useEffect(() => {
+    if (selectedClientId && activeTab === 'meta') {
+      fetchMetaMetrics(selectedClientId, dateRange as MetaDateRange);
     }
   }, [selectedClientId, dateRange, activeTab]);
 
