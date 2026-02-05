@@ -1,286 +1,202 @@
 
+# Plano: Evolução do Sistema de Agendamento de Posts
 
-# Plano: Sistema de Agendamento de Posts para Redes Sociais
+## Situação Atual
 
-## Esclarecimento Importante: Como Funciona a Conexão
+A conexão com Instagram/Facebook já está funcionando. Agora precisamos adicionar a funcionalidade de **agendar posts** a partir do Calendário Editorial.
 
-Você mencionou que no mLabs é só colocar usuário e senha do Instagram. **Infelizmente, isso não é mais possível com a API oficial do Meta.**
+## O que Será Implementado
 
-### Por que não posso usar usuário/senha?
+### 1. Botão "Agendar Publicação" na Página de Detalhes
 
-A Meta (Facebook/Instagram) **não permite** que apps de terceiros coletem login/senha dos usuários. Isso é proibido por:
-- Termos de Uso da Meta
-- Segurança (evitar roubo de credenciais)
-- Conformidade com GDPR/LGPD
-
-O mLabs e outras ferramentas usam o **fluxo OAuth** por trás dos panos - quando você clica "conectar Instagram", ele redireciona para o Facebook onde você faz login e autoriza o app.
-
-### O que precisamos usar
-
-**Facebook Login + Graph API** = Método oficial e obrigatório
-- Usuário clica "Conectar Instagram/Facebook"
-- Redireciona para página do Facebook para autenticação
-- Usuário autoriza as permissões necessárias
-- Sistema recebe um **Access Token** para publicar em nome do usuário
-
----
-
-## Requisitos do Meta App
-
-Já temos os secrets configurados:
-- `META_APP_ID` ✓
-- `META_APP_SECRET` ✓
-
-### Permissões Necessárias no Meta for Developers
-
-Para publicar posts, precisamos solicitar (no console do Meta for Developers):
-- `pages_manage_posts` - Publicar no Facebook
-- `pages_read_engagement` - Ler informações da página
-- `instagram_basic` - Informações básicas do Instagram
-- `instagram_content_publish` - Publicar no Instagram
-
-**Importante:** Para produção, o app precisa passar por App Review da Meta.
-
----
-
-## Arquitetura da Solução
+Quando o conteúdo estiver com status **"Aprovado"** ou superior, aparecerá um botão para agendar a publicação nas redes sociais conectadas.
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        ADMIN PANEL                                       │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│   /admin/social-media (NOVA PÁGINA)                                     │
-│   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │  Gerenciar Conexões de Mídias Sociais                           │   │
-│   │                                                                  │   │
-│   │  [Selector: Cliente] ▼                                          │   │
-│   │                                                                  │   │
-│   │  ┌──────────────────┐  ┌──────────────────┐                     │   │
-│   │  │  Instagram       │  │  Facebook        │                     │   │
-│   │  │  @perfil_cliente │  │  Página FB       │                     │   │
-│   │  │  [Conectado] ✓   │  │  [Conectado] ✓   │                     │   │
-│   │  │  [Desconectar]   │  │  [Desconectar]   │                     │   │
-│   │  └──────────────────┘  └──────────────────┘                     │   │
-│   │                                                                  │   │
-│   │  OU (se não conectado):                                         │   │
-│   │  [Conectar Instagram/Facebook]                                  │   │
-│   │  → Redireciona para OAuth do Meta                               │   │
-│   └─────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  📷 como vender mais em 2026                                     │
+│  Instagram • O Macegossa                       [Aprovado ▼]     │
+│                                                                  │
+│  [Excluir]  [Salvar]  [📅 Agendar Publicação]  ← NOVO BOTÃO    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     FLUXO DE AGENDAMENTO                                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  1. Admin cria conteúdo no Calendário Editorial                         │
-│  2. Ao aprovar, opção "Agendar para Publicação"                         │
-│  3. Abre modal para:                                                    │
-│     - Selecionar plataformas (Instagram, Facebook)                      │
-│     - Upload de mídia (imagem/vídeo)                                    │
-│     - Definir legenda + hashtags                                        │
-│     - Escolher data/hora de publicação                                  │
-│  4. Post é salvo em `scheduled_posts`                                   │
-│  5. Cron job publica automaticamente na hora agendada                   │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
+### 2. Modal de Agendamento Completo
+
+Ao clicar em "Agendar Publicação", abrirá um modal com:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agendar Publicação                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Plataformas:                                                   │
+│  ┌────────────────┐  ┌────────────────┐                         │
+│  │ ☑ Instagram    │  │ ☑ Facebook     │                         │
+│  │ @omacegossa    │  │ O Macegossa    │                         │
+│  └────────────────┘  └────────────────┘                         │
+│                                                                  │
+│  Mídia:                                                         │
+│  ┌───────────────────────────────────────┐                      │
+│  │  📷 Arraste ou clique para upload     │                      │
+│  │     Imagem ou Vídeo (até 50MB)        │                      │
+│  └───────────────────────────────────────┘                      │
+│  [imagem_preview.jpg] ✕                                         │
+│                                                                  │
+│  Legenda:                                                       │
+│  ┌───────────────────────────────────────┐                      │
+│  │ Descubra como vender mais em 2026...  │                      │
+│  │ (pré-preenchido com conteúdo IA)      │                      │
+│  └───────────────────────────────────────┘                      │
+│  📊 Caracteres: 234/2200                                        │
+│                                                                  │
+│  Hashtags:                                                      │
+│  #vendas #marketing #2026 #negocios                             │
+│                                                                  │
+│  Data e Hora:                                                   │
+│  [📅 11/02/2026]  [⏰ 10:30]                                    │
+│                                                                  │
+│  ─────────────────────────────────────────────                  │
+│  [Cancelar]              [📅 Agendar] [▶ Publicar Agora]        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3. Lista de Posts Agendados
+
+Na mesma página ou em uma seção dedicada, mostrará os posts agendados para este conteúdo:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  📅 Agendamentos                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  📷 Instagram                  📅 11/02 às 10:30                │
+│  @omacegossa                  [Agendado]  [Editar] [Cancelar]   │
+│                                                                  │
+│  📘 Facebook                   📅 11/02 às 10:30                │
+│  O Macegossa                  [Agendado]  [Editar] [Cancelar]   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Tabelas do Banco de Dados
+## Arquitetura Técnica
 
-### Tabela: `social_connections` (conexões por cliente)
+### Banco de Dados
 
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| id | uuid | Identificador único |
-| client_id | uuid | FK para clients |
-| platform | enum | 'instagram', 'facebook', 'linkedin' |
-| access_token | text | Token OAuth (criptografado) |
-| refresh_token | text | Para renovar o token |
-| token_expires_at | timestamptz | Quando expira |
-| platform_user_id | text | ID do usuário na plataforma |
-| platform_username | text | @username ou nome da página |
-| page_id | text | ID da página (Facebook) |
-| created_at | timestamptz | - |
-| updated_at | timestamptz | - |
+**Criar bucket de storage para mídias:**
+```sql
+-- Bucket público para mídias de posts sociais
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('social-media', 'social-media', true);
 
-### Tabela: `scheduled_posts` (posts agendados)
+-- Políticas de acesso
+-- Admins podem fazer upload e gerenciar
+-- Público pode visualizar (necessário para Meta API)
+```
 
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| id | uuid | Identificador único |
-| client_id | uuid | FK para clients |
-| editorial_content_id | uuid | FK para editorial_contents (opcional) |
-| platform | enum | 'instagram', 'facebook' |
-| post_type | enum | 'image', 'carousel', 'video', 'story', 'reel' |
-| media_urls | jsonb | Array de URLs das mídias |
-| caption | text | Legenda do post |
-| hashtags | text[] | Hashtags separadas |
-| scheduled_at | timestamptz | Data/hora para publicar |
-| published_at | timestamptz | Quando foi publicado |
-| status | enum | 'scheduled', 'publishing', 'published', 'failed' |
-| platform_post_id | text | ID do post após publicação |
-| error_message | text | Mensagem de erro (se falhou) |
-| created_by | uuid | Quem agendou |
-| created_at | timestamptz | - |
+### Edge Functions
 
----
+**1. `social-publish` (nova função)**
+- Publica o post na plataforma selecionada
+- Para Instagram: usa fluxo em 2 etapas (`/media` → `/media_publish`)
+- Para Facebook: usa `/photos` ou `/feed`
+- Atualiza status do post após publicação
 
-## Edge Functions
-
-### 1. `social-auth` - Fluxo OAuth
-- **Ação `init`**: Gera URL de autorização do Meta
-- **Ação `callback`**: Recebe code, troca por access_token, salva conexão
-- **Ação `select-page`**: Quando usuário tem múltiplas páginas, permite escolher
-
-### 2. `social-publish` - Publicar Post
-- Recebe post_id ou dados do post
-- Busca token da conexão do cliente
-- Chama Graph API para publicar:
-  - Instagram: /media → /media_publish
-  - Facebook: /photos ou /feed
-- Atualiza status do post
-
-### 3. `social-scheduler` (Cron Job)
-- Roda a cada 5 minutos
+**2. `social-scheduler` (cron job - futuro)**
+- Executa a cada 5 minutos
 - Busca posts com `scheduled_at <= now()` e `status = 'scheduled'`
-- Publica cada post via `social-publish`
-- Atualiza status
+- Chama `social-publish` para cada um
 
----
+### Componentes Frontend
 
-## Componentes do Frontend
+**1. `SchedulePostModal.tsx` (novo)**
+- Modal para configurar o agendamento
+- Upload de mídia
+- Edição de legenda e hashtags
+- Seleção de data/hora
 
-### Novos Componentes
+**2. `ScheduledPostsList.tsx` (novo)**
+- Lista posts agendados para um conteúdo
+- Ações: editar, cancelar, publicar agora
 
-1. **`/admin/social-media`** - Página de gerenciamento
-   - Lista conexões por cliente
-   - Botão para conectar novas plataformas
-   - Status de cada conexão
+**3. Alterações em `ContentDetail.tsx`**
+- Adicionar botão "Agendar Publicação"
+- Integrar modal e lista
 
-2. **`SocialConnectButton`** - Botão de conexão
-   - Inicia fluxo OAuth
-   - Mostra modal de seleção se múltiplas páginas
+### Hook `useScheduledPosts.ts` (novo)
 
-3. **`SchedulePostModal`** - Modal de agendamento
-   - Upload de mídia
-   - Editor de legenda
-   - Seletor de plataformas
-   - Picker de data/hora
-
-4. **`ScheduledPostsList`** - Lista de posts agendados
-   - Grid/tabela de posts
-   - Ações: editar, cancelar, publicar agora
-
----
-
-## Fluxo de Conexão (Detalhado)
-
-```text
-USUÁRIO                     FRONTEND                      EDGE FUNCTION                  META API
-   │                           │                               │                            │
-   │  Clica "Conectar"         │                               │                            │
-   │ ────────────────────────> │                               │                            │
-   │                           │  social-auth (init)           │                            │
-   │                           │ ────────────────────────────> │                            │
-   │                           │                               │  Gera URL OAuth            │
-   │                           │ <──────────────────────────── │                            │
-   │  Redireciona para Meta    │                               │                            │
-   │ <──────────────────────── │                               │                            │
-   │                           │                               │                            │
-   │  Faz login no Facebook    │                               │                            │
-   │ ──────────────────────────────────────────────────────────────────────────────────────>│
-   │                           │                               │                            │
-   │  Autoriza permissões      │                               │                            │
-   │ ──────────────────────────────────────────────────────────────────────────────────────>│
-   │                           │                               │                            │
-   │  Redirect com code        │                               │                            │
-   │ <──────────────────────────────────────────────────────────────────────────────────────│
-   │                           │                               │                            │
-   │  Chega em /admin/social-media?code=XXX                    │                            │
-   │ ────────────────────────> │                               │                            │
-   │                           │  social-auth (callback)       │                            │
-   │                           │ ────────────────────────────> │                            │
-   │                           │                               │  Troca code por token      │
-   │                           │                               │ ──────────────────────────>│
-   │                           │                               │  Access Token              │
-   │                           │                               │ <──────────────────────────│
-   │                           │                               │  Busca páginas do usuário  │
-   │                           │                               │ ──────────────────────────>│
-   │                           │                               │  Lista de páginas          │
-   │                           │                               │ <──────────────────────────│
-   │                           │  Se múltiplas páginas:        │                            │
-   │                           │  retorna lista para seleção   │                            │
-   │                           │ <──────────────────────────── │                            │
-   │  Seleciona página         │                               │                            │
-   │ ────────────────────────> │                               │                            │
-   │                           │  social-auth (select-page)    │                            │
-   │                           │ ────────────────────────────> │                            │
-   │                           │                               │  Salva conexão no banco    │
-   │                           │ <──────────────────────────── │                            │
-   │  Conexão salva! ✓         │                               │                            │
-   │ <──────────────────────── │                               │                            │
+```typescript
+// Gerencia posts agendados
+- createScheduledPost()
+- updateScheduledPost()
+- deleteScheduledPost()
+- publishNow()
 ```
 
 ---
 
 ## Ordem de Implementação
 
-### Fase 1: Infraestrutura (Base)
-1. Criar tabelas `social_connections` e `scheduled_posts` com RLS
-2. Criar edge function `social-auth` com fluxo OAuth
-3. Criar página `/admin/social-media` básica
+### Fase 2.1: Infraestrutura de Storage
+1. Criar bucket `social-media` no storage
+2. Configurar políticas de acesso
 
-### Fase 2: Conexão de Contas
-4. Implementar `SocialConnectButton` com OAuth
-5. Adicionar modal de seleção de página
-6. Testar conexão end-to-end
+### Fase 2.2: UI de Agendamento
+3. Criar `SchedulePostModal.tsx` com upload de mídia
+4. Criar hook `useScheduledPosts.ts`
+5. Adicionar botão e modal no `ContentDetail.tsx`
+6. Pré-preencher legenda com conteúdo da IA (se existir)
 
-### Fase 3: Agendamento de Posts
-7. Criar `SchedulePostModal` com upload de mídia
-8. Implementar edge function `social-publish`
-9. Integrar com Calendário Editorial
+### Fase 2.3: Publicação
+7. Criar edge function `social-publish`
+8. Implementar fluxo de publicação para Instagram e Facebook
+9. Adicionar lista de posts agendados
+10. Testar publicação completa
 
-### Fase 4: Publicação Automática
-10. Criar cron job `social-scheduler`
-11. Adicionar lista de posts agendados
-12. Implementar ações (editar, cancelar, republicar)
-
----
-
-## Configuração Necessária no Meta for Developers
-
-Antes de começar, você precisa configurar no console do Meta:
-
-1. **App Settings > Basic**
-   - Adicionar domínio: `macservices.lovable.app`
-
-2. **Facebook Login > Settings**
-   - Valid OAuth Redirect URIs:
-     ```
-     https://vsqlwyabgfccszqycmto.supabase.co/functions/v1/social-auth
-     ```
-
-3. **Permissions**
-   - Solicitar: `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `pages_read_engagement`
-
-4. **App Mode**
-   - Para testes: adicionar usuários como Testers
-   - Para produção: submeter para App Review
+### Fase 2.4: Automação (futuro)
+11. Criar cron job `social-scheduler`
+12. Implementar verificação automática de posts
 
 ---
 
-## Resumo
+## Fluxo do Usuário Final
 
-| Item | Status |
-|------|--------|
-| Meta App configurado | ✓ Secrets existem |
-| OAuth será via redirect | Método oficial |
-| Múltiplos clientes | ✓ Cada cliente terá sua conexão |
-| Múltiplas páginas | ✓ Modal de seleção |
-| Instagram + Facebook | ✓ Ambos suportados |
-| LinkedIn (futuro) | Arquitetura preparada |
+```text
+1. Admin cria conteúdo no Calendário Editorial
+2. Admin gera conteúdo com IA (opcional)
+3. Cliente aprova o conteúdo
+4. Admin clica em "Agendar Publicação"
+5. Modal abre com:
+   - Plataformas conectadas do cliente
+   - Legenda pré-preenchida (se IA gerou)
+   - Hashtags sugeridas
+   - Campo para upload de mídia
+6. Admin faz upload da imagem/vídeo
+7. Escolhe data/hora
+8. Clica em "Agendar" ou "Publicar Agora"
+9. Post é salvo na tabela scheduled_posts
+10. Na hora agendada, cron job publica automaticamente
+```
 
+---
+
+## Pré-requisitos da Configuração Meta
+
+Para que a publicação funcione, o app Meta precisa ter:
+- **Permissões**: `instagram_content_publish`, `pages_manage_posts`
+- **App Mode**: Em modo de teste ou aprovado pelo App Review
+- **URLs de mídia**: Devem ser públicas (por isso o bucket será público)
+
+---
+
+## Resumo das Mudanças
+
+| Componente | Ação |
+|------------|------|
+| Storage bucket `social-media` | Criar |
+| `SchedulePostModal.tsx` | Criar |
+| `ScheduledPostsList.tsx` | Criar |
+| `useScheduledPosts.ts` | Criar |
+| `social-publish` edge function | Criar |
+| `ContentDetail.tsx` | Modificar (adicionar botão + integração) |
