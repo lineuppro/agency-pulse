@@ -224,6 +224,47 @@ export type Database = {
           },
         ]
       }
+      client_meta_ads: {
+        Row: {
+          access_token: string
+          ad_account_id: string
+          ad_account_name: string | null
+          client_id: string
+          created_at: string
+          id: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          ad_account_id: string
+          ad_account_name?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          ad_account_id?: string
+          ad_account_name?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_meta_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string
@@ -570,6 +611,53 @@ export type Database = {
           },
         ]
       }
+      meta_connections: {
+        Row: {
+          access_token: string
+          client_id: string
+          created_at: string
+          facebook_page_id: string | null
+          facebook_page_name: string | null
+          id: string
+          instagram_account_id: string | null
+          instagram_username: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          client_id: string
+          created_at?: string
+          facebook_page_id?: string | null
+          facebook_page_name?: string | null
+          id?: string
+          instagram_account_id?: string | null
+          instagram_username?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          client_id?: string
+          created_at?: string
+          facebook_page_id?: string | null
+          facebook_page_name?: string | null
+          id?: string
+          instagram_account_id?: string | null
+          instagram_username?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_connections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           client_id: string | null
@@ -604,6 +692,78 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_posts: {
+        Row: {
+          caption: string | null
+          client_id: string
+          created_at: string
+          created_by: string
+          editorial_content_id: string | null
+          error_message: string | null
+          hashtags: string[] | null
+          id: string
+          media_urls: Json
+          meta_post_id: string | null
+          platform: Database["public"]["Enums"]["meta_platform"]
+          post_type: Database["public"]["Enums"]["meta_post_type"]
+          published_at: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["scheduled_post_status"]
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          client_id: string
+          created_at?: string
+          created_by: string
+          editorial_content_id?: string | null
+          error_message?: string | null
+          hashtags?: string[] | null
+          id?: string
+          media_urls?: Json
+          meta_post_id?: string | null
+          platform?: Database["public"]["Enums"]["meta_platform"]
+          post_type?: Database["public"]["Enums"]["meta_post_type"]
+          published_at?: string | null
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["scheduled_post_status"]
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          editorial_content_id?: string | null
+          error_message?: string | null
+          hashtags?: string[] | null
+          id?: string
+          media_urls?: Json
+          meta_post_id?: string | null
+          platform?: Database["public"]["Enums"]["meta_platform"]
+          post_type?: Database["public"]["Enums"]["meta_post_type"]
+          published_at?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["scheduled_post_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_editorial_content_id_fkey"
+            columns: ["editorial_content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
             referencedColumns: ["id"]
           },
         ]
@@ -868,6 +1028,9 @@ export type Database = {
         | "email"
         | "google_ads"
         | "other"
+      meta_platform: "instagram" | "facebook" | "both"
+      meta_post_type: "image" | "video" | "carousel" | "reel" | "story"
+      scheduled_post_status: "scheduled" | "publishing" | "published" | "failed"
       task_category: "ads" | "dev" | "automation" | "creative"
       task_status: "pending" | "in_progress" | "completed"
     }
@@ -1013,6 +1176,9 @@ export const Constants = {
         "google_ads",
         "other",
       ],
+      meta_platform: ["instagram", "facebook", "both"],
+      meta_post_type: ["image", "video", "carousel", "reel", "story"],
+      scheduled_post_status: ["scheduled", "publishing", "published", "failed"],
       task_category: ["ads", "dev", "automation", "creative"],
       task_status: ["pending", "in_progress", "completed"],
     },
