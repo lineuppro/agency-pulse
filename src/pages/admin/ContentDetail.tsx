@@ -34,6 +34,7 @@ import {
   Reply,
   ChevronDown,
   ChevronUp,
+  CalendarPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +71,8 @@ import { getContentTypeLabel, getContentStatusLabel } from '@/hooks/useEditorial
 import { useLinkedAIContent } from '@/hooks/useLinkedAIContent';
 import { useEditorialContentComments, type ReactionType } from '@/hooks/useEditorialContentComments';
 import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
+import { SchedulePostModal } from '@/components/social/SchedulePostModal';
+import { ScheduledPostsList } from '@/components/social/ScheduledPostsList';
 
 const contentTypeConfig: Record<ContentType, { icon: typeof Instagram; color: string; bgColor: string }> = {
   instagram: { icon: Instagram, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30' },
@@ -126,6 +129,7 @@ export default function AdminContentDetail() {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Fetch content
   const { data: content, isLoading: isContentLoading } = useQuery({
@@ -224,6 +228,10 @@ export default function AdminContentDetail() {
   const typeConfig = contentTypeConfig[content.content_type];
   const TypeIcon = typeConfig.icon;
   const hasAIContent = !!aiContent;
+  
+  // Check if content can be scheduled (approved or published status)
+  const canSchedule = ['approved', 'published'].includes(content.status);
+  const isSocialContent = ['instagram', 'facebook'].includes(content.content_type);
 
   const handleSave = () => {
     if (!scheduledDate) return;
@@ -339,6 +347,17 @@ export default function AdminContentDetail() {
             <Save className="h-4 w-4 mr-2" />
             Salvar
           </Button>
+
+          {canSchedule && isSocialContent && (
+            <Button 
+              variant="default"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Agendar Publicação
+            </Button>
+          )}
         </div>
       </div>
 
@@ -513,6 +532,11 @@ export default function AdminContentDetail() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Scheduled Posts List */}
+          {isSocialContent && (
+            <ScheduledPostsList editorialContentId={contentId} />
           )}
         </div>
 
@@ -759,6 +783,18 @@ export default function AdminContentDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Schedule Post Modal */}
+      {content && (
+        <SchedulePostModal
+          open={isScheduleModalOpen}
+          onOpenChange={setIsScheduleModalOpen}
+          clientId={content.client_id}
+          editorialContentId={contentId}
+          defaultCaption={aiContent?.content || aiContent?.subtitle || ''}
+          defaultHashtags={aiContent?.hashtags || []}
+        />
+      )}
     </div>
   );
 }
