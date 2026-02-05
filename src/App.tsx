@@ -21,7 +21,8 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import AdminClients from "./pages/admin/Clients";
 import AdminUsers from "./pages/admin/Users";
 import AdminTasks from "./pages/admin/Tasks";
-import AdminPerformance from "./pages/admin/Performance";
+import AdminGoogleAds from "./pages/admin/GoogleAdsPerformance";
+import AdminMetaAds from "./pages/admin/MetaAdsPerformance";
 import AdminChat from "./pages/admin/Chat";
 import AdminSettings from "./pages/admin/Settings";
 import AdminFiles from "./pages/admin/Files";
@@ -67,7 +68,8 @@ const App = () => (
                 <Route path="clients" element={<AdminClients />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="tasks" element={<AdminTasks />} />
-                <Route path="performance" element={<AdminPerformance />} />
+                <Route path="google-ads" element={<AdminGoogleAds />} />
+                <Route path="meta-ads" element={<AdminMetaAds />} />
                 <Route path="social-media" element={<AdminSocialMedia />} />
                 <Route path="files" element={<AdminFiles />} />
                 <Route path="calendar" element={<AdminCalendar />} />
