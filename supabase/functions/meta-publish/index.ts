@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 Deno.serve(async (req) => {
@@ -16,34 +17,37 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      console.error('No auth header provided');
+      console.error('[meta-publish] No auth header provided');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const userSupabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    // User client for auth validation
+    const userSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
+
+    // Service role client for database operations (bypasses RLS)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Validate user session
     const { data: { user }, error: userError } = await userSupabase.auth.getUser();
     if (userError || !user) {
-      console.error('Invalid user session:', userError);
+      console.error('[meta-publish] Invalid user session:', userError);
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('User authenticated:', user.id);
+    console.log('[meta-publish] User authenticated:', user.id);
 
     const { scheduledPostId } = await req.json();
-    console.log('Publishing post:', scheduledPostId);
+    console.log('[meta-publish] Publishing post:', scheduledPostId);
 
-    // Get scheduled post
+    // Get scheduled post using service role
     const { data: post, error: postError } = await supabase
       .from('scheduled_posts')
       .select('*')
@@ -51,14 +55,21 @@ Deno.serve(async (req) => {
       .single();
 
     if (postError || !post) {
-      console.error('Post not found:', postError);
+      console.error('[meta-publish] Post not found:', postError);
       return new Response(JSON.stringify({ error: 'Post not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Get meta connection for the client
+    console.log('[meta-publish] Found post:', {
+      id: post.id,
+      clientId: post.client_id,
+      platform: post.platform,
+      postType: post.post_type,
+    });
+
+    // Get meta connection for the client using service role
     const { data: connection, error: connError } = await supabase
       .from('meta_connections')
       .select('*')
@@ -66,9 +77,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (connError || !connection) {
+      console.error('[meta-publish] Meta connection not found:', connError);
       await supabase
         .from('scheduled_posts')
-        .update({ status: 'failed', error_message: 'Meta connection not found' })
+        .update({ status: 'failed', error_message: 'Conexão Meta não encontrada. Reconecte a conta.' })
         .eq('id', scheduledPostId);
       
       return new Response(JSON.stringify({ error: 'Meta connection not found' }), {
@@ -76,6 +88,11 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('[meta-publish] Found connection:', {
+      facebookPageId: connection.facebook_page_id,
+      instagramAccountId: connection.instagram_account_id,
+    });
 
     // Update status to publishing
     await supabase
@@ -97,12 +114,14 @@ Deno.serve(async (req) => {
       // Publish to Instagram if applicable
       if ((post.platform === 'instagram' || post.platform === 'both') && connection.instagram_account_id) {
         const igAccountId = connection.instagram_account_id;
+        console.log('[meta-publish] Publishing to Instagram:', igAccountId);
 
         if (post.post_type === 'carousel' && mediaUrls.length > 1) {
           // Create carousel container
           const childIds: string[] = [];
           
           for (const url of mediaUrls) {
+            console.log('[meta-publish] Creating carousel item:', url);
             const childResponse = await fetch(
               `https://graph.facebook.com/v21.0/${igAccountId}/media`,
               {
@@ -116,10 +135,18 @@ Deno.serve(async (req) => {
               }
             );
             const childData = await childResponse.json();
+            
+            if (childData.error) {
+              console.error('[meta-publish] Carousel item error:', childData.error);
+              throw new Error(childData.error.message);
+            }
+            
             if (childData.id) {
               childIds.push(childData.id);
             }
           }
+
+          console.log('[meta-publish] Created carousel items:', childIds.length);
 
           // Create carousel container
           const carouselResponse = await fetch(
@@ -137,6 +164,11 @@ Deno.serve(async (req) => {
           );
           const carouselData = await carouselResponse.json();
 
+          if (carouselData.error) {
+            console.error('[meta-publish] Carousel container error:', carouselData.error);
+            throw new Error(carouselData.error.message);
+          }
+
           if (carouselData.id) {
             // Publish the carousel
             const publishResponse = await fetch(
@@ -151,11 +183,19 @@ Deno.serve(async (req) => {
               }
             );
             const publishData = await publishResponse.json();
+            
+            if (publishData.error) {
+              throw new Error(publishData.error.message);
+            }
+            
             metaPostId = publishData.id;
+            console.log('[meta-publish] Carousel published:', metaPostId);
           }
         } else if (post.post_type === 'video' || post.post_type === 'reel') {
           // Create video/reel container
           const videoUrl = mediaUrls[0];
+          console.log('[meta-publish] Creating video container:', videoUrl);
+          
           const mediaResponse = await fetch(
             `https://graph.facebook.com/v21.0/${igAccountId}/media`,
             {
@@ -171,46 +211,16 @@ Deno.serve(async (req) => {
           );
           const mediaData = await mediaResponse.json();
 
-          if (mediaData.id) {
-            // Wait for processing and publish
-            await new Promise(resolve => setTimeout(resolve, 10000));
-            
-            const publishResponse = await fetch(
-              `https://graph.facebook.com/v21.0/${igAccountId}/media_publish`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  creation_id: mediaData.id,
-                  access_token: accessToken,
-                }),
-              }
-            );
-            const publishData = await publishResponse.json();
-            metaPostId = publishData.id;
-          }
-        } else {
-          // Single image post
-          const imageUrl = mediaUrls[0];
-          const mediaResponse = await fetch(
-            `https://graph.facebook.com/v21.0/${igAccountId}/media`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                image_url: imageUrl,
-                caption,
-                access_token: accessToken,
-              }),
-            }
-          );
-          const mediaData = await mediaResponse.json();
-
           if (mediaData.error) {
+            console.error('[meta-publish] Video container error:', mediaData.error);
             throw new Error(mediaData.error.message);
           }
 
           if (mediaData.id) {
+            // Wait for processing and publish
+            console.log('[meta-publish] Waiting for video processing...');
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
             const publishResponse = await fetch(
               `https://graph.facebook.com/v21.0/${igAccountId}/media_publish`,
               {
@@ -229,6 +239,54 @@ Deno.serve(async (req) => {
             }
             
             metaPostId = publishData.id;
+            console.log('[meta-publish] Video published:', metaPostId);
+          }
+        } else {
+          // Single image post
+          const imageUrl = mediaUrls[0];
+          console.log('[meta-publish] Creating image container:', imageUrl);
+          
+          const mediaResponse = await fetch(
+            `https://graph.facebook.com/v21.0/${igAccountId}/media`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image_url: imageUrl,
+                caption,
+                access_token: accessToken,
+              }),
+            }
+          );
+          const mediaData = await mediaResponse.json();
+
+          if (mediaData.error) {
+            console.error('[meta-publish] Image container error:', mediaData.error);
+            throw new Error(mediaData.error.message);
+          }
+
+          if (mediaData.id) {
+            console.log('[meta-publish] Publishing image:', mediaData.id);
+            const publishResponse = await fetch(
+              `https://graph.facebook.com/v21.0/${igAccountId}/media_publish`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  creation_id: mediaData.id,
+                  access_token: accessToken,
+                }),
+              }
+            );
+            const publishData = await publishResponse.json();
+            
+            if (publishData.error) {
+              console.error('[meta-publish] Publish error:', publishData.error);
+              throw new Error(publishData.error.message);
+            }
+            
+            metaPostId = publishData.id;
+            console.log('[meta-publish] Image published:', metaPostId);
           }
         }
       }
@@ -236,6 +294,7 @@ Deno.serve(async (req) => {
       // Publish to Facebook if applicable
       if ((post.platform === 'facebook' || post.platform === 'both') && connection.facebook_page_id) {
         const pageId = connection.facebook_page_id;
+        console.log('[meta-publish] Publishing to Facebook:', pageId);
 
         if (mediaUrls.length > 0) {
           // Post with photo
@@ -254,12 +313,14 @@ Deno.serve(async (req) => {
           const photoData = await photoResponse.json();
           
           if (photoData.error) {
+            console.error('[meta-publish] Facebook photo error:', photoData.error);
             throw new Error(photoData.error.message);
           }
           
           if (!metaPostId) {
             metaPostId = photoData.post_id || photoData.id;
           }
+          console.log('[meta-publish] Facebook photo published:', photoData.id);
         } else {
           // Text-only post
           const postResponse = await fetch(
@@ -276,12 +337,14 @@ Deno.serve(async (req) => {
           const postData = await postResponse.json();
           
           if (postData.error) {
+            console.error('[meta-publish] Facebook post error:', postData.error);
             throw new Error(postData.error.message);
           }
           
           if (!metaPostId) {
             metaPostId = postData.id;
           }
+          console.log('[meta-publish] Facebook text post published:', postData.id);
         }
       }
 
@@ -295,13 +358,13 @@ Deno.serve(async (req) => {
         })
         .eq('id', scheduledPostId);
 
-      console.log('Post published successfully:', metaPostId);
+      console.log('[meta-publish] Post published successfully:', metaPostId);
 
       return new Response(JSON.stringify({ success: true, metaPostId }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (publishError) {
-      console.error('Publish error:', publishError);
+      console.error('[meta-publish] Publish error:', publishError);
       
       await supabase
         .from('scheduled_posts')
@@ -317,7 +380,7 @@ Deno.serve(async (req) => {
       });
     }
   } catch (error) {
-    console.error('Meta publish error:', error);
+    console.error('[meta-publish] Error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

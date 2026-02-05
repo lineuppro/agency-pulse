@@ -2,16 +2,28 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Facebook, Instagram, Link, Unlink, Loader2 } from 'lucide-react';
-import { useMetaConnection } from '@/hooks/useMetaConnection';
+import { useMetaConnection, PageOption } from '@/hooks/useMetaConnection';
 
 interface MetaConnectButtonProps {
   clientId: string;
 }
 
 export function MetaConnectButton({ clientId }: MetaConnectButtonProps) {
-  const { connection, loading, connecting, getAuthUrl, exchangeCode, disconnect } = useMetaConnection(clientId);
+  const { 
+    connection, 
+    loading, 
+    connecting, 
+    availablePages,
+    getAuthUrl, 
+    exchangeCode, 
+    selectPage,
+    cancelSelection,
+    disconnect 
+  } = useMetaConnection(clientId);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [selectingPage, setSelectingPage] = useState<string | null>(null);
 
   // Handle OAuth callback
   useEffect(() => {
@@ -24,8 +36,8 @@ export function MetaConnectButton({ clientId }: MetaConnectButtonProps) {
         const parsedState = JSON.parse(decodeURIComponent(state));
         if (parsedState.clientId === clientId) {
           const redirectUri = `${window.location.origin}${window.location.pathname}`;
-          exchangeCode(code, redirectUri).then(() => {
-            // Clean up URL
+          exchangeCode(code, redirectUri).then((result) => {
+            // Clean up URL regardless of result
             window.history.replaceState({}, document.title, window.location.pathname);
           });
         }
@@ -46,12 +58,65 @@ export function MetaConnectButton({ clientId }: MetaConnectButtonProps) {
     setIsConnecting(false);
   };
 
+  const handleSelectPage = async (page: PageOption) => {
+    setSelectingPage(page.id);
+    await selectPage(page.id);
+    setSelectingPage(null);
+  };
+
   if (loading) {
     return (
       <Button variant="outline" disabled>
         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
         Carregando...
       </Button>
+    );
+  }
+
+  // Show page selection dialog
+  if (availablePages && availablePages.length > 0) {
+    return (
+      <Dialog open={true} onOpenChange={(open) => !open && cancelSelection()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecione a Página</DialogTitle>
+            <DialogDescription>
+              Você tem acesso a múltiplas páginas. Selecione qual deseja conectar a este cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-4">
+            {availablePages.map((page) => (
+              <Button
+                key={page.id}
+                variant="outline"
+                className="w-full justify-start h-auto py-3"
+                disabled={connecting}
+                onClick={() => handleSelectPage(page)}
+              >
+                {selectingPage === page.id ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Facebook className="h-4 w-4 mr-2 text-primary" />
+                )}
+                <div className="text-left">
+                  <div className="font-medium">{page.name}</div>
+                  {page.instagram_username && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Instagram className="h-3 w-3" />
+                      @{page.instagram_username}
+                    </div>
+                  )}
+                </div>
+              </Button>
+            ))}
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="ghost" onClick={cancelSelection} disabled={connecting}>
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 

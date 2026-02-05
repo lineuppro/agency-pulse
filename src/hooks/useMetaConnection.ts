@@ -14,10 +14,20 @@ export interface MetaConnection {
   updated_at: string;
 }
 
+export interface PageOption {
+  id: string;
+  name: string;
+  access_token: string;
+  instagram_account_id?: string;
+  instagram_username?: string;
+}
+
 export function useMetaConnection(clientId: string | null) {
   const [connection, setConnection] = useState<MetaConnection | null>(null);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [availablePages, setAvailablePages] = useState<PageOption[] | null>(null);
+  const [userAccessToken, setUserAccessToken] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchConnection = async () => {
@@ -70,7 +80,7 @@ export function useMetaConnection(clientId: string | null) {
   };
 
   const exchangeCode = async (code: string, redirectUri: string) => {
-    if (!clientId) return false;
+    if (!clientId) return { success: false, requiresSelection: false };
     
     setConnecting(true);
     try {
@@ -84,13 +94,20 @@ export function useMetaConnection(clientId: string | null) {
 
       if (error) throw error;
 
+      // Check if multiple pages available - requires selection
+      if (data.requiresSelection && data.pages) {
+        setAvailablePages(data.pages);
+        setUserAccessToken(data.userAccessToken);
+        return { success: false, requiresSelection: true };
+      }
+
       if (data.success) {
         toast({
           title: 'Conectado!',
           description: `Conectado a ${data.connection.facebookPageName || 'Meta'}`,
         });
         await fetchConnection();
-        return true;
+        return { success: true, requiresSelection: false };
       }
 
       throw new Error(data.error || 'Failed to connect');
@@ -101,10 +118,60 @@ export function useMetaConnection(clientId: string | null) {
         description: error.message || 'Falha ao conectar conta Meta',
         variant: 'destructive',
       });
+      return { success: false, requiresSelection: false };
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const selectPage = async (pageId: string) => {
+    if (!clientId || !userAccessToken) return false;
+    
+    setConnecting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.functions.invoke('meta-auth', {
+        body: { 
+          action: 'select-page', 
+          clientId, 
+          selectedPageId: pageId,
+          userAccessToken,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: 'Conectado!',
+          description: `Conectado a ${data.connection.facebookPageName || 'Meta'}`,
+        });
+        setAvailablePages(null);
+        setUserAccessToken(null);
+        await fetchConnection();
+        return true;
+      }
+
+      throw new Error(data.error || 'Failed to connect');
+    } catch (error: any) {
+      console.error('Error selecting page:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao selecionar página',
+        variant: 'destructive',
+      });
       return false;
     } finally {
       setConnecting(false);
     }
+  };
+
+  const cancelSelection = () => {
+    setAvailablePages(null);
+    setUserAccessToken(null);
   };
 
   const disconnect = async () => {
@@ -149,8 +216,11 @@ export function useMetaConnection(clientId: string | null) {
     connection,
     loading,
     connecting,
+    availablePages,
     getAuthUrl,
     exchangeCode,
+    selectPage,
+    cancelSelection,
     disconnect,
     refetch: fetchConnection,
   };
