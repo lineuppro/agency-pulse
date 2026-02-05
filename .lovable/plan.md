@@ -1,279 +1,127 @@
 
-# Plano: Integração com Meta (Facebook/Instagram)
 
-## Visão Geral
+# Plano para Resolver os Problemas de Meta Ads e Social Media
 
-Este plano implementa duas funcionalidades principais usando a **Meta Graph API**:
-1. **Agendamento e Publicação de Posts** no Instagram/Facebook
-2. **Dashboard de Meta Ads** (campanhas de tráfego pago)
+## Resumo dos Problemas Identificados
 
----
+Após investigar o código e banco de dados, identifiquei **3 problemas principais**:
 
-## Pré-requisitos Importantes
+### Problema 1: Meta Ads Metrics não funciona
+**Causa:** A tabela `client_meta_ads` está **vazia** - não há nenhuma configuração de conta de anúncios para nenhum cliente. O sistema busca métricas de anúncios a partir desta tabela, que precisa conter o **Ad Account ID** e **Access Token**.
 
-Antes de começar a implementação, você precisará:
+**Diferença importante:** A conexão de **Social Media** (tabela `meta_connections`) é diferente da configuração de **Meta Ads** (tabela `client_meta_ads`):
+- `meta_connections` = Para publicar posts no Instagram/Facebook
+- `client_meta_ads` = Para buscar métricas de campanhas de anúncios
 
-### 1. Criar um App no Meta for Developers
-- Acesse: https://developers.facebook.com/apps
-- Crie um novo app do tipo "Business"
-- Anote o **App ID** e **App Secret**
+### Problema 2: Não consegue adicionar novo perfil para "O Macegossa"
+**Causa:** A conexão OAuth sempre pega a **primeira página** retornada pela API Meta (linha 99 do meta-auth: `const page = pagesData.data[0]`). Se o usuário tem acesso a múltiplas páginas, não há como escolher qual conectar - sempre será a primeira.
 
-### 2. Solicitar Permissões via App Review
+**Situação atual no banco:**
+- "Delta Ultrassons" → conectado a @deltaultrassons
+- "O Macegossa" → também conectado a @deltaultrassons (deveria ter sua própria página!)
 
-A Meta exige aprovação manual para permissões avançadas. Você precisará solicitar:
-
-| Permissão | Para que serve |
-|-----------|----------------|
-| `instagram_basic` | Ler informações da conta Instagram |
-| `instagram_content_publish` | Publicar posts no Instagram |
-| `pages_manage_posts` | Publicar no Facebook |
-| `pages_read_engagement` | Ler métricas do Facebook |
-| `ads_read` | Ler campanhas e métricas de Ads |
-| `ads_management` | Gerenciar campanhas (opcional) |
-
-**Tempo estimado**: O processo de App Review pode levar de **1 a 4 semanas**.
-
-### 3. Conectar Conta Business
-
-Cada cliente precisará:
-- Uma **Página do Facebook** conectada ao Instagram Business
-- Uma **Conta de Anúncios** (para Meta Ads)
-- Autorizar seu app a acessar essas contas
+### Problema 3: Publicação manual pode falhar silenciosamente
+**Causa:** A função `meta-publish` foi corrigida mas ainda pode ter problemas ao buscar a conexão Meta do cliente.
 
 ---
 
-## Parte 1: Agendamento de Posts (como MLabs)
+## Plano de Solução
 
-### Como Funciona a API
+### Fase 1: Corrigir a Configuração de Meta Ads
+
+**1.1 Atualizar meta-auth para também configurar Meta Ads automaticamente**
+- Durante o fluxo OAuth, buscar as Ad Accounts disponíveis do usuário
+- Salvar a primeira Ad Account encontrada na tabela `client_meta_ads`
+- Isso permitirá que ao conectar a conta Meta, tanto Social Media quanto Ads sejam configurados
+
+**1.2 Adicionar logs detalhados**
+- Melhorar logging na função `meta-ads-metrics` para debugar problemas
+
+### Fase 2: Permitir Seleção de Página no OAuth
+
+**2.1 Modificar meta-auth para suportar seleção de página**
+- Quando o usuário tem múltiplas páginas, retornar a lista para o frontend
+- Criar um fluxo de 2 etapas: OAuth → Seleção de Página
+
+**2.2 Atualizar MetaConnectButton**
+- Adicionar modal para selecionar a página quando houver múltiplas opções
+- Permitir reconectar com página diferente
+
+### Fase 3: Melhorar a Publicação de Posts
+
+**3.1 Corrigir meta-publish**
+- Usar service role para acessar `meta_connections` (evita problemas de RLS)
+- Adicionar mais logs de diagnóstico
+- Melhorar tratamento de erros
+
+---
+
+## Mudanças Técnicas Detalhadas
+
+### Arquivos a Modificar
 
 ```text
-Fluxo de Publicação:
-                                                    
-1. Upload da mídia (imagem/vídeo)
-   POST /ig-user-id/media
-   → Retorna: creation_id
-                                                    
-2. Publicar o container
-   POST /ig-user-id/media_publish
-   → Retorna: media_id (post publicado!)
-                                                    
-3. Para agendamento futuro:
-   - Salvar no banco com data/hora
-   - Cron job executa na hora marcada
+supabase/functions/meta-auth/index.ts
+├── Adicionar busca de Ad Accounts durante OAuth
+├── Salvar Ad Account na tabela client_meta_ads
+├── Adicionar suporte para seleção de página (action: 'select-page')
+└── Melhorar logs
+
+supabase/functions/meta-ads-metrics/index.ts
+├── Adicionar logs detalhados
+├── Usar service role para queries no banco
+└── Melhorar mensagens de erro
+
+supabase/functions/meta-publish/index.ts
+├── Usar service role para acessar meta_connections
+├── Adicionar logs de debug
+└── Corrigir fluxo de publicação
+
+src/components/meta/MetaConnectButton.tsx
+├── Adicionar estado para seleção de página
+├── Mostrar modal quando múltiplas páginas disponíveis
+└── Permitir reconexão com página diferente
+
+src/hooks/useMetaConnection.ts
+├── Adicionar função para listar páginas disponíveis
+└── Adicionar função para selecionar página específica
 ```
 
-### Limitações da API
-
-- **25 posts por dia** por conta Instagram (via API)
-- Não existe agendamento nativo na API - você salva e publica via cron
-- Reels e Stories têm endpoints específicos
-- Carrosséis suportam até 10 imagens
-
-### Novas Tabelas
+### Fluxo Corrigido para Meta Ads
 
 ```text
-scheduled_posts
-├── id (uuid)
-├── client_id (uuid)
-├── editorial_content_id (uuid, opcional)
-├── platform: 'instagram' | 'facebook' | 'both'
-├── post_type: 'image' | 'video' | 'carousel' | 'reel' | 'story'
-├── media_urls (jsonb) - URLs das imagens/vídeos
-├── caption (text)
-├── hashtags (text[])
-├── scheduled_at (timestamptz)
-├── published_at (timestamptz)
-├── status: 'scheduled' | 'publishing' | 'published' | 'failed'
-├── meta_post_id (text) - ID do post na Meta
-├── error_message (text)
-└── created_at, updated_at
-
-meta_connections
-├── id (uuid)
-├── client_id (uuid)
-├── facebook_page_id (text)
-├── instagram_account_id (text)
-├── access_token (text, criptografado)
-├── token_expires_at (timestamptz)
-└── created_at, updated_at
-```
-
-### Edge Functions Necessárias
-
-1. **meta-auth** - Fluxo OAuth para conectar contas
-2. **meta-publish** - Publicar posts
-3. **meta-scheduler** - Cron que verifica posts agendados
-
-### Interface de Agendamento
-
-```text
-+------------------------------------------------------------------+
-|  Agendar Publicação                                    [X]       |
-+------------------------------------------------------------------+
-|                                                                   |
-|  Plataforma:  [x] Instagram  [x] Facebook                        |
-|                                                                   |
-|  Tipo:  ( ) Imagem  ( ) Vídeo  ( ) Carrossel  ( ) Reels          |
-|                                                                   |
-|  +------------------------+  +-----------------------------+      |
-|  | [Arrastar imagem aqui] |  | Preview Instagram           |      |
-|  |                        |  | +-------------------------+  |      |
-|  | ou selecionar arquivo  |  | |      [ Imagem ]        |  |      |
-|  +------------------------+  | |                        |  |      |
-|                              | | @suaempresa             |  |      |
-|  Legenda:                    | | Legenda do post...      |  |      |
-|  +------------------------+  | +-------------------------+  |      |
-|  | Texto da legenda...    |  +-----------------------------+      |
-|  |                        |                                       |
-|  +------------------------+                                       |
-|                                                                   |
-|  Hashtags: #marketing #2026                                       |
-|                                                                   |
-|  Data e Hora: [17/02/2026] [14:30]                               |
-|                                                                   |
-|  +-------------------+  +-------------------+                     |
-|  |     Cancelar      |  |  Agendar Post     |                     |
-|  +-------------------+  +-------------------+                     |
-+------------------------------------------------------------------+
+1. Usuário clica "Conectar Meta"
+2. OAuth redireciona para Facebook
+3. Após autorização, sistema busca:
+   - Páginas do Facebook
+   - Conta do Instagram de cada página
+   - Ad Accounts disponíveis
+4. Se múltiplas páginas, mostra modal para seleção
+5. Salva em meta_connections (Social Media)
+6. Salva em client_meta_ads (Ads - se Ad Account disponível)
+7. Métricas passam a funcionar automaticamente
 ```
 
 ---
 
-## Parte 2: Dashboard Meta Ads
+## Solução Rápida (Opcional)
 
-### Estrutura da API
+Se preferir uma solução mais rápida enquanto implementamos o fluxo completo:
 
-Similar ao Google Ads que vocês já têm implementado:
+**Configurar manualmente o Meta Ads para Delta:**
+1. Obter o Ad Account ID do Meta Business Manager (formato: act_XXXXX)
+2. Usar o access_token existente da tabela `meta_connections`
+3. Inserir manualmente na tabela `client_meta_ads`
 
-```text
-GET /act_{ad-account-id}/insights
-   ?fields=spend,impressions,clicks,cpc,cpm,reach,frequency,
-           actions,cost_per_action_type
-   &date_preset=last_30d
-   &level=campaign
-```
-
-### Métricas Disponíveis
-
-| Métrica | Descrição |
-|---------|-----------|
-| spend | Valor gasto |
-| impressions | Impressões |
-| reach | Alcance único |
-| clicks | Cliques |
-| cpc | Custo por clique |
-| cpm | Custo por mil impressões |
-| ctr | Taxa de cliques |
-| frequency | Frequência média |
-| conversions | Conversões (se pixel configurado) |
-| roas | Retorno sobre investimento |
-
-### Nova Tabela
-
-```text
-client_meta_ads
-├── id (uuid)
-├── client_id (uuid)
-├── ad_account_id (text)
-├── access_token (text, criptografado)
-├── token_expires_at (timestamptz)
-└── created_at, updated_at
-```
-
-### Edge Function
-
-**meta-ads-metrics** - Similar à google-ads-metrics existente
-
-### Interface no Dashboard
-
-Adicionar uma aba "Meta Ads" na página de Performance, com:
-- Cards de métricas principais (Gasto, ROAS, Alcance, etc.)
-- Tabela de campanhas com performance
-- Gráficos de evolução
-- Filtros por período e campanha
-
----
-
-## Arquivos a Criar
-
-### Banco de Dados (Migrations)
-
-1. Tabela `scheduled_posts`
-2. Tabela `meta_connections`
-3. Tabela `client_meta_ads`
-4. Políticas RLS apropriadas
-
-### Edge Functions
-
-1. `supabase/functions/meta-auth/index.ts` - OAuth flow
-2. `supabase/functions/meta-publish/index.ts` - Publicação
-3. `supabase/functions/meta-scheduler/index.ts` - Cron job
-4. `supabase/functions/meta-ads-metrics/index.ts` - Métricas de Ads
-
-### Hooks
-
-1. `src/hooks/useMetaConnection.ts` - Gerenciar conexão OAuth
-2. `src/hooks/useScheduledPosts.ts` - CRUD de posts agendados
-3. `src/hooks/useMetaAdsMetrics.ts` - Buscar métricas
-
-### Componentes
-
-1. `src/components/meta/MetaConnectButton.tsx` - Botão OAuth
-2. `src/components/meta/SchedulePostModal.tsx` - Modal de agendamento
-3. `src/components/meta/PostPreview.tsx` - Preview do post
-4. `src/components/meta/MetaAdsCard.tsx` - Cards de métricas
-
-### Páginas
-
-1. Atualizar `src/pages/admin/Performance.tsx` - Adicionar aba Meta Ads
-2. Nova página ou modal de configuração de conexões Meta
-
----
-
-## Secrets Necessários
-
-Você precisará configurar:
-
-| Secret | Descrição |
-|--------|-----------|
-| META_APP_ID | ID do app Meta |
-| META_APP_SECRET | Secret do app Meta |
-
-Os tokens de acesso dos clientes serão armazenados no banco de dados (tabela `meta_connections`).
+Isso faria as métricas funcionarem imediatamente para Delta, enquanto implementamos o fluxo automático.
 
 ---
 
 ## Ordem de Implementação Sugerida
 
-### Fase 1: Configuração (1-2 dias)
-1. Criar app no Meta for Developers
-2. Configurar secrets
-3. Criar migrations do banco
+1. **Primeiro:** Corrigir `meta-ads-metrics` com logs e usar service role
+2. **Segundo:** Atualizar `meta-auth` para salvar Ad Account automaticamente
+3. **Terceiro:** Implementar seleção de página no frontend
+4. **Quarto:** Testar publicação de posts
+5. **Quinto:** Limpar conexões duplicadas no banco de dados
 
-### Fase 2: Autenticação OAuth (2-3 dias)
-1. Edge function meta-auth
-2. Fluxo de conexão na interface
-3. Armazenamento seguro de tokens
-
-### Fase 3: Meta Ads Dashboard (3-4 dias)
-1. Edge function meta-ads-metrics
-2. Hook useMetaAdsMetrics
-3. Interface no dashboard de Performance
-
-### Fase 4: Agendamento de Posts (5-7 dias)
-1. Edge function meta-publish
-2. Interface de agendamento
-3. Sistema de cron para publicação automática
-4. Notificações de sucesso/falha
-
----
-
-## Próximos Passos Imediatos
-
-Antes de começar a implementação, você precisa:
-
-1. **Criar o app no Meta for Developers** e obter App ID + Secret
-2. **Iniciar o processo de App Review** para as permissões necessárias
-3. **Ter uma conta Instagram Business** para testes
-
-Quer que eu comece pela implementação do **Meta Ads Dashboard** (mais simples, similar ao Google Ads) ou pelo **Sistema de Agendamento de Posts**?
