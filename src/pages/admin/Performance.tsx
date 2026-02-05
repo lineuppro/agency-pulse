@@ -11,7 +11,7 @@ import {
   Lightbulb, Minus, Search, Hash
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useGoogleAdsDetailed, DateRange } from '@/hooks/useGoogleAdsDetailed';
+import { useGoogleAdsDetailed, DateRange, KeywordData, Opportunity, Alert } from '@/hooks/useGoogleAdsDetailed';
 import { useToast } from '@/hooks/use-toast';
 
 interface Client {
@@ -62,7 +62,7 @@ const getSeverityColor = (severity: string) => {
   }
 };
 
-export default function GoogleAdsPerformance() {
+export default function AdminPerformance() {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [dateRange, setDateRange] = useState<DateRange>('LAST_30_DAYS');
@@ -169,9 +169,9 @@ export default function GoogleAdsPerformance() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Google Ads</h1>
+          <h1 className="text-3xl font-bold text-foreground">Performance</h1>
           <p className="text-muted-foreground mt-1">
-            Métricas de campanhas Google Ads
+            Métricas completas do Google Ads
           </p>
         </div>
         
@@ -224,8 +224,8 @@ export default function GoogleAdsPerformance() {
             <Card key={i} className={`${getSeverityColor(alert.severity)}`}>
               <CardContent className="py-3 flex items-center gap-3">
                 <AlertTriangle className={`h-5 w-5 ${
-                  alert.severity === 'critical' ? 'text-destructive' :
-                  alert.severity === 'warning' ? 'text-warning' : 'text-primary'
+                  alert.severity === 'critical' ? 'text-red-500' :
+                  alert.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'
                 }`} />
                 <div>
                   <p className="font-medium text-sm">{alert.title}</p>
@@ -246,7 +246,7 @@ export default function GoogleAdsPerformance() {
               Selecione um cliente
             </h3>
             <p className="text-sm text-muted-foreground text-center">
-              Escolha um cliente acima para visualizar as métricas
+              Escolha um cliente acima para visualizar as métricas do Google Ads
             </p>
           </CardContent>
         </Card>
@@ -254,9 +254,9 @@ export default function GoogleAdsPerformance() {
 
       {/* No Google Ads Warning */}
       {selectedClientId && selectedClient && !selectedClient.google_ads_id && (
-        <Card className="border-warning/50 bg-warning/10">
+        <Card className="border-yellow-500/50 bg-yellow-500/10">
           <CardContent className="py-4">
-            <p className="text-sm text-warning">
+            <p className="text-sm text-yellow-600">
               O cliente <strong>{selectedClient.name}</strong> não possui ID do Google Ads configurado.
             </p>
           </CardContent>
@@ -271,7 +271,6 @@ export default function GoogleAdsPerformance() {
         </Card>
       )}
 
-      {/* Google Ads Content */}
       {selectedClientId && selectedClient?.google_ads_id && (
         <>
           {/* Metrics Cards */}

@@ -13,8 +13,7 @@ import {
   BarChart3,
   FolderOpen,
   FileText,
-  CalendarDays,
-  Share2
+  CalendarDays
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,9 +37,7 @@ const menuItems = [
   { title: 'Clientes', url: '/admin/clients', icon: Building2 },
   { title: 'Usuários', url: '/admin/users', icon: Users },
   { title: 'Tarefas', url: '/admin/tasks', icon: CheckSquare },
-  { title: 'Google Ads', url: '/admin/google-ads', icon: BarChart3 },
-  { title: 'Meta Ads', url: '/admin/meta-ads', icon: Share2 },
-  { title: 'Social Media', url: '/admin/social-media', icon: Share2 },
+  { title: 'Performance', url: '/admin/performance', icon: BarChart3 },
   { title: 'Arquivos', url: '/admin/files', icon: FolderOpen },
   { title: 'Calendário Editorial', url: '/admin/calendar', icon: CalendarDays },
   { title: 'Criação de Conteúdo', url: '/admin/content-creation', icon: Zap },

@@ -1,127 +1,211 @@
 
 
-# Plano para Resolver os Problemas de Meta Ads e Social Media
+# Plano: Melhorias do Calendário Editorial
 
-## Resumo dos Problemas Identificados
+## Visao Geral
 
-Após investigar o código e banco de dados, identifiquei **3 problemas principais**:
-
-### Problema 1: Meta Ads Metrics não funciona
-**Causa:** A tabela `client_meta_ads` está **vazia** - não há nenhuma configuração de conta de anúncios para nenhum cliente. O sistema busca métricas de anúncios a partir desta tabela, que precisa conter o **Ad Account ID** e **Access Token**.
-
-**Diferença importante:** A conexão de **Social Media** (tabela `meta_connections`) é diferente da configuração de **Meta Ads** (tabela `client_meta_ads`):
-- `meta_connections` = Para publicar posts no Instagram/Facebook
-- `client_meta_ads` = Para buscar métricas de campanhas de anúncios
-
-### Problema 2: Não consegue adicionar novo perfil para "O Macegossa"
-**Causa:** A conexão OAuth sempre pega a **primeira página** retornada pela API Meta (linha 99 do meta-auth: `const page = pagesData.data[0]`). Se o usuário tem acesso a múltiplas páginas, não há como escolher qual conectar - sempre será a primeira.
-
-**Situação atual no banco:**
-- "Delta Ultrassons" → conectado a @deltaultrassons
-- "O Macegossa" → também conectado a @deltaultrassons (deveria ter sua própria página!)
-
-### Problema 3: Publicação manual pode falhar silenciosamente
-**Causa:** A função `meta-publish` foi corrigida mas ainda pode ter problemas ao buscar a conexão Meta do cliente.
+Este plano implementa melhorias significativas no sistema de Calendário Editorial, criando uma experiencia mais completa e colaborativa para administradores, designers e clientes.
 
 ---
 
-## Plano de Solução
+## 1. Nova Pagina de Detalhes do Conteudo
 
-### Fase 1: Corrigir a Configuração de Meta Ads
+Substituir o sidebar atual por uma pagina dedicada (`/admin/calendar/:contentId` e `/portal/calendar/:contentId`) com layout mais espacoso.
 
-**1.1 Atualizar meta-auth para também configurar Meta Ads automaticamente**
-- Durante o fluxo OAuth, buscar as Ad Accounts disponíveis do usuário
-- Salvar a primeira Ad Account encontrada na tabela `client_meta_ads`
-- Isso permitirá que ao conectar a conta Meta, tanto Social Media quanto Ads sejam configurados
-
-**1.2 Adicionar logs detalhados**
-- Melhorar logging na função `meta-ads-metrics` para debugar problemas
-
-### Fase 2: Permitir Seleção de Página no OAuth
-
-**2.1 Modificar meta-auth para suportar seleção de página**
-- Quando o usuário tem múltiplas páginas, retornar a lista para o frontend
-- Criar um fluxo de 2 etapas: OAuth → Seleção de Página
-
-**2.2 Atualizar MetaConnectButton**
-- Adicionar modal para selecionar a página quando houver múltiplas opções
-- Permitir reconectar com página diferente
-
-### Fase 3: Melhorar a Publicação de Posts
-
-**3.1 Corrigir meta-publish**
-- Usar service role para acessar `meta_connections` (evita problemas de RLS)
-- Adicionar mais logs de diagnóstico
-- Melhorar tratamento de erros
-
----
-
-## Mudanças Técnicas Detalhadas
-
-### Arquivos a Modificar
+### Layout da Pagina
 
 ```text
-supabase/functions/meta-auth/index.ts
-├── Adicionar busca de Ad Accounts durante OAuth
-├── Salvar Ad Account na tabela client_meta_ads
-├── Adicionar suporte para seleção de página (action: 'select-page')
-└── Melhorar logs
-
-supabase/functions/meta-ads-metrics/index.ts
-├── Adicionar logs detalhados
-├── Usar service role para queries no banco
-└── Melhorar mensagens de erro
-
-supabase/functions/meta-publish/index.ts
-├── Usar service role para acessar meta_connections
-├── Adicionar logs de debug
-└── Corrigir fluxo de publicação
-
-src/components/meta/MetaConnectButton.tsx
-├── Adicionar estado para seleção de página
-├── Mostrar modal quando múltiplas páginas disponíveis
-└── Permitir reconexão com página diferente
-
-src/hooks/useMetaConnection.ts
-├── Adicionar função para listar páginas disponíveis
-└── Adicionar função para selecionar página específica
++------------------------------------------------------------------+
+|  [<] Voltar ao Calendario    Status: [Rascunho v]    [Acoes v]   |
++------------------------------------------------------------------+
+|                                                                   |
+|  +-------------------+  +--------------------------------------+  |
+|  | INFO BASICAS      |  | CONTEUDO COMPLETO                    | |
+|  | Instagram Post    |  | (area de leitura do artigo/post)     | |
+|  | Cliente: Empresa  |  |                                       | |
+|  | Data: 17/02/2026  |  | Titulo: LinkedIn 2026: Venda Mais!   | |
+|  | Campanha: ...     |  | Subtitulo: Dicas para...             | |
+|  +-------------------+  |                                       | |
+|                         | [Conteudo gerado pela IA aqui]        | |
+|  +-------------------+  |                                       | |
+|  | METRICAS SEO      |  +--------------------------------------+ |
+|  | Score: 72         |  |                                       | |
+|  | Palavras: 1500    |  | +----------------------------------+   | |
+|  | Densidade: 1.5%   |  | | COMENTARIOS E OBSERVACOES        |  | |
+|  +-------------------+  | | (sistema de threads)              |  | |
+|                         | +----------------------------------+   | |
+|  +-------------------+  |                                       | |
+|  | HASHTAGS          |  |                                       | |
+|  | #marketing #...   |  |                                       | |
+|  +-------------------+  +--------------------------------------+ |
++------------------------------------------------------------------+
 ```
 
-### Fluxo Corrigido para Meta Ads
+### Componentes
 
-```text
-1. Usuário clica "Conectar Meta"
-2. OAuth redireciona para Facebook
-3. Após autorização, sistema busca:
-   - Páginas do Facebook
-   - Conta do Instagram de cada página
-   - Ad Accounts disponíveis
-4. Se múltiplas páginas, mostra modal para seleção
-5. Salva em meta_connections (Social Media)
-6. Salva em client_meta_ads (Ads - se Ad Account disponível)
-7. Métricas passam a funcionar automaticamente
+- **Header**: Navegacao, seletor de status, menu de acoes (editar, excluir)
+- **Painel Esquerdo**: Informacoes basicas, metricas SEO, hashtags, sugestoes de imagem
+- **Painel Direito**: Conteudo completo (legivel), sistema de comentarios
+
+---
+
+## 2. Sistema de Comentarios para Conteudo Editorial
+
+Criar tabela e logica para comentarios no conteudo editorial (similar ao sistema de tasks).
+
+### Nova Tabela: `editorial_content_comments`
+
+| Coluna | Tipo | Descricao |
+|--------|------|-----------|
+| id | uuid | Chave primaria |
+| editorial_content_id | uuid | FK para editorial_contents |
+| user_id | uuid | Quem comentou |
+| content | text | Texto do comentario |
+| parent_comment_id | uuid | Para replies (threads) |
+| created_at | timestamp | Data de criacao |
+
+### Nova Tabela: `editorial_content_reactions`
+
+| Coluna | Tipo | Descricao |
+|--------|------|-----------|
+| id | uuid | Chave primaria |
+| comment_id | uuid | FK para editorial_content_comments |
+| user_id | uuid | Quem reagiu |
+| reaction_type | text | like, heart, celebrate, thinking |
+
+### Funcionalidades
+
+- Comentarios com threads (respostas aninhadas)
+- Reacoes com emojis
+- Visivel para Admin, Designer e Cliente
+- Log de atividade para historico
+
+---
+
+## 3. Visualizacao em Lista
+
+Nova aba ou toggle no calendario para visualizacao em lista de todos os conteudos.
+
+### Colunas da Lista
+
+| Data | Status | Tipo | Titulo | Cliente | Comentarios | Acoes |
+|------|--------|------|--------|---------|-------------|-------|
+| 17/02 | Rascunho | Instagram | LinkedIn 2026 | Empresa X | 3 | [Ver] |
+
+### Recursos
+
+- Ordenacao por data, status, tipo
+- Filtros rapidos
+- Badge com contagem de comentarios
+- Clique leva para pagina de detalhes
+
+---
+
+## 4. Subtitulo para Posts Instagram
+
+Adicionar campo `subtitle` gerado pela IA para posts de redes sociais.
+
+### Alteracoes
+
+1. **Banco de Dados**: Adicionar coluna `subtitle` em `ai_generated_contents`
+2. **Edge Function**: Atualizar prompt para gerar subtitulo
+3. **Interface**: Exibir subtitulo na pagina de detalhes e formulario
+
+---
+
+## 5. Roles e Permissoes
+
+### Visibilidade por Role
+
+| Funcionalidade | Admin | Designer | Cliente |
+|---------------|-------|----------|---------|
+| Criar conteudo | Sim | Nao | Nao |
+| Editar conteudo | Sim | Nao | Nao |
+| Comentar | Sim | Sim | Sim |
+| Aprovar/Rejeitar | Sim | Nao | Sim |
+| Ver metricas SEO | Sim | Sim | Nao |
+| Ver sugestoes imagem | Sim | Sim | Nao |
+
+**Nota**: Designers sao usuarios admin, entao terao acesso completo. Clientes verao uma versao simplificada focada em aprovacao e feedback.
+
+---
+
+## Arquivos a Criar/Modificar
+
+### Novos Arquivos
+
+1. `src/pages/admin/ContentDetail.tsx` - Pagina de detalhes (admin)
+2. `src/pages/portal/ContentDetail.tsx` - Pagina de detalhes (cliente)
+3. `src/hooks/useEditorialContentComments.ts` - Hook para comentarios
+4. `src/components/calendar/ContentListView.tsx` - Visualizacao em lista
+
+### Arquivos Modificados
+
+1. `src/App.tsx` - Novas rotas
+2. `src/pages/admin/Calendar.tsx` - Toggle lista/calendario
+3. `src/pages/portal/Calendar.tsx` - Toggle lista/calendario
+4. `src/components/calendar/CalendarView.tsx` - Click navega para pagina
+5. `supabase/functions/generate-content/index.ts` - Adicionar subtitulo
+
+---
+
+## Detalhes Tecnicos
+
+### Migracao de Banco de Dados
+
+```sql
+-- Adicionar subtitulo
+ALTER TABLE ai_generated_contents 
+ADD COLUMN subtitle text;
+
+-- Tabela de comentarios
+CREATE TABLE editorial_content_comments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  editorial_content_id uuid REFERENCES editorial_contents(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  content text NOT NULL,
+  parent_comment_id uuid REFERENCES editorial_content_comments(id),
+  created_at timestamptz DEFAULT now()
+);
+
+-- Tabela de reacoes
+CREATE TABLE editorial_content_reactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id uuid REFERENCES editorial_content_comments(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  reaction_type text NOT NULL CHECK (reaction_type IN ('like','heart','celebrate','thinking')),
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(comment_id, user_id, reaction_type)
+);
+
+-- Indexes
+CREATE INDEX idx_editorial_comments_content ON editorial_content_comments(editorial_content_id);
+CREATE INDEX idx_editorial_comments_parent ON editorial_content_comments(parent_comment_id);
+
+-- RLS policies para comentarios e reacoes
+```
+
+### Atualizacao do Prompt da IA
+
+Para posts de Instagram, o formato JSON retornado incluira:
+
+```json
+{
+  "title": "Titulo Principal",
+  "subtitle": "Subtitulo para o Designer",
+  "content": "Legenda completa...",
+  "hashtags": [...],
+  "image_suggestions": [...]
+}
 ```
 
 ---
 
-## Solução Rápida (Opcional)
+## Sugestoes Adicionais
 
-Se preferir uma solução mais rápida enquanto implementamos o fluxo completo:
-
-**Configurar manualmente o Meta Ads para Delta:**
-1. Obter o Ad Account ID do Meta Business Manager (formato: act_XXXXX)
-2. Usar o access_token existente da tabela `meta_connections`
-3. Inserir manualmente na tabela `client_meta_ads`
-
-Isso faria as métricas funcionarem imediatamente para Delta, enquanto implementamos o fluxo automático.
-
----
-
-## Ordem de Implementação Sugerida
-
-1. **Primeiro:** Corrigir `meta-ads-metrics` com logs e usar service role
-2. **Segundo:** Atualizar `meta-auth` para salvar Ad Account automaticamente
-3. **Terceiro:** Implementar seleção de página no frontend
-4. **Quarto:** Testar publicação de posts
-5. **Quinto:** Limpar conexões duplicadas no banco de dados
+1. **Notificacoes**: Alertar usuarios quando receberem comentarios em seus conteudos
+2. **Historico de Alteracoes**: Log de quem editou o que e quando
+3. **Anexos**: Permitir upload de imagens/arquivos nos comentarios
+4. **Mencoes**: Marcar usuarios com @ nos comentarios
+5. **Preview Mobile**: Simular como o post ficaria no Instagram/Facebook
 

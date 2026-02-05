@@ -1,8 +1,9 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 async function getAccessToken(): Promise<string> {
@@ -176,18 +177,20 @@ async function fetchGoogleAdsMetrics(customerId: string, accessToken: string, da
   };
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   console.log('=== google-ads-metrics function invoked ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Auth
-    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
+    // Manual auth check (since verify_jwt is disabled for debugging)
+    const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header');
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: 'Missing Authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -197,27 +200,31 @@ Deno.serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+    
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
     if (authError || !user) {
+      console.error('Auth validation failed:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: authError?.message || 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    console.log('Authenticated user:', user.id);
 
     const body = await req.json();
     const { clientId, dateRange = 'LAST_30_DAYS' } = body;
+    console.log('Request body:', { clientId, dateRange });
 
     if (!clientId) {
+      console.error('Missing clientId in request');
       return new Response(
         JSON.stringify({ error: 'Client ID is required', details: 'clientId parameter is missing from request body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Fetch client config with service key
+    // Get client's Google Ads ID from database (reuse URL, use service role key)
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -225,9 +232,10 @@ Deno.serve(async (req) => {
       .from('clients')
       .select('google_ads_id, name')
       .eq('id', clientId)
-      .maybeSingle();
+      .single();
 
     if (clientError || !client) {
+      console.error('Client fetch error:', clientError);
       return new Response(
         JSON.stringify({ error: 'Client not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -241,23 +249,30 @@ Deno.serve(async (req) => {
       );
     }
 
+    console.log(`Fetching metrics for client: ${client.name} (${client.google_ads_id})`);
+
+    // Get access token
     const accessToken = await getAccessToken();
+    
+    // Fetch metrics from Google Ads API
     const metrics = await fetchGoogleAdsMetrics(client.google_ads_id, accessToken, dateRange);
 
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         clientName: client.name,
         dateRange,
-        metrics,
+        metrics 
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('google-ads-metrics error:', error);
+    console.error('Edge function error:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error('Error stack:', stack);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: message, details: stack?.substring(0, 500) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
