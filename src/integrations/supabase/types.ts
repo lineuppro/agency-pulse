@@ -768,6 +768,131 @@ export type Database = {
           },
         ]
       }
+      social_connections: {
+        Row: {
+          access_token: string
+          client_id: string
+          created_at: string
+          id: string
+          page_id: string | null
+          page_name: string | null
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_user_id: string | null
+          platform_username: string | null
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          client_id: string
+          created_at?: string
+          id?: string
+          page_id?: string | null
+          page_name?: string | null
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_user_id?: string | null
+          platform_username?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          page_id?: string | null
+          page_name?: string | null
+          platform?: Database["public"]["Enums"]["social_platform"]
+          platform_user_id?: string | null
+          platform_username?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_scheduled_posts: {
+        Row: {
+          caption: string | null
+          client_id: string
+          created_at: string
+          created_by: string
+          editorial_content_id: string | null
+          error_message: string | null
+          hashtags: string[] | null
+          id: string
+          media_urls: Json
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_post_id: string | null
+          post_type: Database["public"]["Enums"]["social_post_type"]
+          published_at: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["social_post_status"]
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          client_id: string
+          created_at?: string
+          created_by: string
+          editorial_content_id?: string | null
+          error_message?: string | null
+          hashtags?: string[] | null
+          id?: string
+          media_urls?: Json
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_post_id?: string | null
+          post_type?: Database["public"]["Enums"]["social_post_type"]
+          published_at?: string | null
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["social_post_status"]
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          editorial_content_id?: string | null
+          error_message?: string | null
+          hashtags?: string[] | null
+          id?: string
+          media_urls?: Json
+          platform?: Database["public"]["Enums"]["social_platform"]
+          platform_post_id?: string | null
+          post_type?: Database["public"]["Enums"]["social_post_type"]
+          published_at?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["social_post_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_scheduled_posts_editorial_content_id_fkey"
+            columns: ["editorial_content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_activity_log: {
         Row: {
           action: string
@@ -1031,6 +1156,26 @@ export type Database = {
       meta_platform: "instagram" | "facebook" | "both"
       meta_post_type: "image" | "video" | "carousel" | "reel" | "story"
       scheduled_post_status: "scheduled" | "publishing" | "published" | "failed"
+      social_platform:
+        | "instagram"
+        | "facebook"
+        | "linkedin"
+        | "tiktok"
+        | "twitter"
+      social_post_status:
+        | "draft"
+        | "scheduled"
+        | "publishing"
+        | "published"
+        | "failed"
+        | "cancelled"
+      social_post_type:
+        | "image"
+        | "video"
+        | "carousel"
+        | "story"
+        | "reel"
+        | "text"
       task_category: "ads" | "dev" | "automation" | "creative"
       task_status: "pending" | "in_progress" | "completed"
     }
@@ -1179,6 +1324,22 @@ export const Constants = {
       meta_platform: ["instagram", "facebook", "both"],
       meta_post_type: ["image", "video", "carousel", "reel", "story"],
       scheduled_post_status: ["scheduled", "publishing", "published", "failed"],
+      social_platform: [
+        "instagram",
+        "facebook",
+        "linkedin",
+        "tiktok",
+        "twitter",
+      ],
+      social_post_status: [
+        "draft",
+        "scheduled",
+        "publishing",
+        "published",
+        "failed",
+        "cancelled",
+      ],
+      social_post_type: ["image", "video", "carousel", "story", "reel", "text"],
       task_category: ["ads", "dev", "automation", "creative"],
       task_status: ["pending", "in_progress", "completed"],
     },
