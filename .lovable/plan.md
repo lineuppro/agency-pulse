@@ -1,211 +1,279 @@
 
+# Plano: Integração com Meta (Facebook/Instagram)
 
-# Plano: Melhorias do Calendário Editorial
+## Visão Geral
 
-## Visao Geral
-
-Este plano implementa melhorias significativas no sistema de Calendário Editorial, criando uma experiencia mais completa e colaborativa para administradores, designers e clientes.
+Este plano implementa duas funcionalidades principais usando a **Meta Graph API**:
+1. **Agendamento e Publicação de Posts** no Instagram/Facebook
+2. **Dashboard de Meta Ads** (campanhas de tráfego pago)
 
 ---
 
-## 1. Nova Pagina de Detalhes do Conteudo
+## Pré-requisitos Importantes
 
-Substituir o sidebar atual por uma pagina dedicada (`/admin/calendar/:contentId` e `/portal/calendar/:contentId`) com layout mais espacoso.
+Antes de começar a implementação, você precisará:
 
-### Layout da Pagina
+### 1. Criar um App no Meta for Developers
+- Acesse: https://developers.facebook.com/apps
+- Crie um novo app do tipo "Business"
+- Anote o **App ID** e **App Secret**
+
+### 2. Solicitar Permissões via App Review
+
+A Meta exige aprovação manual para permissões avançadas. Você precisará solicitar:
+
+| Permissão | Para que serve |
+|-----------|----------------|
+| `instagram_basic` | Ler informações da conta Instagram |
+| `instagram_content_publish` | Publicar posts no Instagram |
+| `pages_manage_posts` | Publicar no Facebook |
+| `pages_read_engagement` | Ler métricas do Facebook |
+| `ads_read` | Ler campanhas e métricas de Ads |
+| `ads_management` | Gerenciar campanhas (opcional) |
+
+**Tempo estimado**: O processo de App Review pode levar de **1 a 4 semanas**.
+
+### 3. Conectar Conta Business
+
+Cada cliente precisará:
+- Uma **Página do Facebook** conectada ao Instagram Business
+- Uma **Conta de Anúncios** (para Meta Ads)
+- Autorizar seu app a acessar essas contas
+
+---
+
+## Parte 1: Agendamento de Posts (como MLabs)
+
+### Como Funciona a API
+
+```text
+Fluxo de Publicação:
+                                                    
+1. Upload da mídia (imagem/vídeo)
+   POST /ig-user-id/media
+   → Retorna: creation_id
+                                                    
+2. Publicar o container
+   POST /ig-user-id/media_publish
+   → Retorna: media_id (post publicado!)
+                                                    
+3. Para agendamento futuro:
+   - Salvar no banco com data/hora
+   - Cron job executa na hora marcada
+```
+
+### Limitações da API
+
+- **25 posts por dia** por conta Instagram (via API)
+- Não existe agendamento nativo na API - você salva e publica via cron
+- Reels e Stories têm endpoints específicos
+- Carrosséis suportam até 10 imagens
+
+### Novas Tabelas
+
+```text
+scheduled_posts
+├── id (uuid)
+├── client_id (uuid)
+├── editorial_content_id (uuid, opcional)
+├── platform: 'instagram' | 'facebook' | 'both'
+├── post_type: 'image' | 'video' | 'carousel' | 'reel' | 'story'
+├── media_urls (jsonb) - URLs das imagens/vídeos
+├── caption (text)
+├── hashtags (text[])
+├── scheduled_at (timestamptz)
+├── published_at (timestamptz)
+├── status: 'scheduled' | 'publishing' | 'published' | 'failed'
+├── meta_post_id (text) - ID do post na Meta
+├── error_message (text)
+└── created_at, updated_at
+
+meta_connections
+├── id (uuid)
+├── client_id (uuid)
+├── facebook_page_id (text)
+├── instagram_account_id (text)
+├── access_token (text, criptografado)
+├── token_expires_at (timestamptz)
+└── created_at, updated_at
+```
+
+### Edge Functions Necessárias
+
+1. **meta-auth** - Fluxo OAuth para conectar contas
+2. **meta-publish** - Publicar posts
+3. **meta-scheduler** - Cron que verifica posts agendados
+
+### Interface de Agendamento
 
 ```text
 +------------------------------------------------------------------+
-|  [<] Voltar ao Calendario    Status: [Rascunho v]    [Acoes v]   |
+|  Agendar Publicação                                    [X]       |
 +------------------------------------------------------------------+
 |                                                                   |
-|  +-------------------+  +--------------------------------------+  |
-|  | INFO BASICAS      |  | CONTEUDO COMPLETO                    | |
-|  | Instagram Post    |  | (area de leitura do artigo/post)     | |
-|  | Cliente: Empresa  |  |                                       | |
-|  | Data: 17/02/2026  |  | Titulo: LinkedIn 2026: Venda Mais!   | |
-|  | Campanha: ...     |  | Subtitulo: Dicas para...             | |
-|  +-------------------+  |                                       | |
-|                         | [Conteudo gerado pela IA aqui]        | |
-|  +-------------------+  |                                       | |
-|  | METRICAS SEO      |  +--------------------------------------+ |
-|  | Score: 72         |  |                                       | |
-|  | Palavras: 1500    |  | +----------------------------------+   | |
-|  | Densidade: 1.5%   |  | | COMENTARIOS E OBSERVACOES        |  | |
-|  +-------------------+  | | (sistema de threads)              |  | |
-|                         | +----------------------------------+   | |
-|  +-------------------+  |                                       | |
-|  | HASHTAGS          |  |                                       | |
-|  | #marketing #...   |  |                                       | |
-|  +-------------------+  +--------------------------------------+ |
+|  Plataforma:  [x] Instagram  [x] Facebook                        |
+|                                                                   |
+|  Tipo:  ( ) Imagem  ( ) Vídeo  ( ) Carrossel  ( ) Reels          |
+|                                                                   |
+|  +------------------------+  +-----------------------------+      |
+|  | [Arrastar imagem aqui] |  | Preview Instagram           |      |
+|  |                        |  | +-------------------------+  |      |
+|  | ou selecionar arquivo  |  | |      [ Imagem ]        |  |      |
+|  +------------------------+  | |                        |  |      |
+|                              | | @suaempresa             |  |      |
+|  Legenda:                    | | Legenda do post...      |  |      |
+|  +------------------------+  | +-------------------------+  |      |
+|  | Texto da legenda...    |  +-----------------------------+      |
+|  |                        |                                       |
+|  +------------------------+                                       |
+|                                                                   |
+|  Hashtags: #marketing #2026                                       |
+|                                                                   |
+|  Data e Hora: [17/02/2026] [14:30]                               |
+|                                                                   |
+|  +-------------------+  +-------------------+                     |
+|  |     Cancelar      |  |  Agendar Post     |                     |
+|  +-------------------+  +-------------------+                     |
 +------------------------------------------------------------------+
 ```
+
+---
+
+## Parte 2: Dashboard Meta Ads
+
+### Estrutura da API
+
+Similar ao Google Ads que vocês já têm implementado:
+
+```text
+GET /act_{ad-account-id}/insights
+   ?fields=spend,impressions,clicks,cpc,cpm,reach,frequency,
+           actions,cost_per_action_type
+   &date_preset=last_30d
+   &level=campaign
+```
+
+### Métricas Disponíveis
+
+| Métrica | Descrição |
+|---------|-----------|
+| spend | Valor gasto |
+| impressions | Impressões |
+| reach | Alcance único |
+| clicks | Cliques |
+| cpc | Custo por clique |
+| cpm | Custo por mil impressões |
+| ctr | Taxa de cliques |
+| frequency | Frequência média |
+| conversions | Conversões (se pixel configurado) |
+| roas | Retorno sobre investimento |
+
+### Nova Tabela
+
+```text
+client_meta_ads
+├── id (uuid)
+├── client_id (uuid)
+├── ad_account_id (text)
+├── access_token (text, criptografado)
+├── token_expires_at (timestamptz)
+└── created_at, updated_at
+```
+
+### Edge Function
+
+**meta-ads-metrics** - Similar à google-ads-metrics existente
+
+### Interface no Dashboard
+
+Adicionar uma aba "Meta Ads" na página de Performance, com:
+- Cards de métricas principais (Gasto, ROAS, Alcance, etc.)
+- Tabela de campanhas com performance
+- Gráficos de evolução
+- Filtros por período e campanha
+
+---
+
+## Arquivos a Criar
+
+### Banco de Dados (Migrations)
+
+1. Tabela `scheduled_posts`
+2. Tabela `meta_connections`
+3. Tabela `client_meta_ads`
+4. Políticas RLS apropriadas
+
+### Edge Functions
+
+1. `supabase/functions/meta-auth/index.ts` - OAuth flow
+2. `supabase/functions/meta-publish/index.ts` - Publicação
+3. `supabase/functions/meta-scheduler/index.ts` - Cron job
+4. `supabase/functions/meta-ads-metrics/index.ts` - Métricas de Ads
+
+### Hooks
+
+1. `src/hooks/useMetaConnection.ts` - Gerenciar conexão OAuth
+2. `src/hooks/useScheduledPosts.ts` - CRUD de posts agendados
+3. `src/hooks/useMetaAdsMetrics.ts` - Buscar métricas
 
 ### Componentes
 
-- **Header**: Navegacao, seletor de status, menu de acoes (editar, excluir)
-- **Painel Esquerdo**: Informacoes basicas, metricas SEO, hashtags, sugestoes de imagem
-- **Painel Direito**: Conteudo completo (legivel), sistema de comentarios
+1. `src/components/meta/MetaConnectButton.tsx` - Botão OAuth
+2. `src/components/meta/SchedulePostModal.tsx` - Modal de agendamento
+3. `src/components/meta/PostPreview.tsx` - Preview do post
+4. `src/components/meta/MetaAdsCard.tsx` - Cards de métricas
+
+### Páginas
+
+1. Atualizar `src/pages/admin/Performance.tsx` - Adicionar aba Meta Ads
+2. Nova página ou modal de configuração de conexões Meta
 
 ---
 
-## 2. Sistema de Comentarios para Conteudo Editorial
+## Secrets Necessários
 
-Criar tabela e logica para comentarios no conteudo editorial (similar ao sistema de tasks).
+Você precisará configurar:
 
-### Nova Tabela: `editorial_content_comments`
+| Secret | Descrição |
+|--------|-----------|
+| META_APP_ID | ID do app Meta |
+| META_APP_SECRET | Secret do app Meta |
 
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | Chave primaria |
-| editorial_content_id | uuid | FK para editorial_contents |
-| user_id | uuid | Quem comentou |
-| content | text | Texto do comentario |
-| parent_comment_id | uuid | Para replies (threads) |
-| created_at | timestamp | Data de criacao |
-
-### Nova Tabela: `editorial_content_reactions`
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | Chave primaria |
-| comment_id | uuid | FK para editorial_content_comments |
-| user_id | uuid | Quem reagiu |
-| reaction_type | text | like, heart, celebrate, thinking |
-
-### Funcionalidades
-
-- Comentarios com threads (respostas aninhadas)
-- Reacoes com emojis
-- Visivel para Admin, Designer e Cliente
-- Log de atividade para historico
+Os tokens de acesso dos clientes serão armazenados no banco de dados (tabela `meta_connections`).
 
 ---
 
-## 3. Visualizacao em Lista
+## Ordem de Implementação Sugerida
 
-Nova aba ou toggle no calendario para visualizacao em lista de todos os conteudos.
+### Fase 1: Configuração (1-2 dias)
+1. Criar app no Meta for Developers
+2. Configurar secrets
+3. Criar migrations do banco
 
-### Colunas da Lista
+### Fase 2: Autenticação OAuth (2-3 dias)
+1. Edge function meta-auth
+2. Fluxo de conexão na interface
+3. Armazenamento seguro de tokens
 
-| Data | Status | Tipo | Titulo | Cliente | Comentarios | Acoes |
-|------|--------|------|--------|---------|-------------|-------|
-| 17/02 | Rascunho | Instagram | LinkedIn 2026 | Empresa X | 3 | [Ver] |
+### Fase 3: Meta Ads Dashboard (3-4 dias)
+1. Edge function meta-ads-metrics
+2. Hook useMetaAdsMetrics
+3. Interface no dashboard de Performance
 
-### Recursos
-
-- Ordenacao por data, status, tipo
-- Filtros rapidos
-- Badge com contagem de comentarios
-- Clique leva para pagina de detalhes
-
----
-
-## 4. Subtitulo para Posts Instagram
-
-Adicionar campo `subtitle` gerado pela IA para posts de redes sociais.
-
-### Alteracoes
-
-1. **Banco de Dados**: Adicionar coluna `subtitle` em `ai_generated_contents`
-2. **Edge Function**: Atualizar prompt para gerar subtitulo
-3. **Interface**: Exibir subtitulo na pagina de detalhes e formulario
+### Fase 4: Agendamento de Posts (5-7 dias)
+1. Edge function meta-publish
+2. Interface de agendamento
+3. Sistema de cron para publicação automática
+4. Notificações de sucesso/falha
 
 ---
 
-## 5. Roles e Permissoes
+## Próximos Passos Imediatos
 
-### Visibilidade por Role
+Antes de começar a implementação, você precisa:
 
-| Funcionalidade | Admin | Designer | Cliente |
-|---------------|-------|----------|---------|
-| Criar conteudo | Sim | Nao | Nao |
-| Editar conteudo | Sim | Nao | Nao |
-| Comentar | Sim | Sim | Sim |
-| Aprovar/Rejeitar | Sim | Nao | Sim |
-| Ver metricas SEO | Sim | Sim | Nao |
-| Ver sugestoes imagem | Sim | Sim | Nao |
+1. **Criar o app no Meta for Developers** e obter App ID + Secret
+2. **Iniciar o processo de App Review** para as permissões necessárias
+3. **Ter uma conta Instagram Business** para testes
 
-**Nota**: Designers sao usuarios admin, entao terao acesso completo. Clientes verao uma versao simplificada focada em aprovacao e feedback.
-
----
-
-## Arquivos a Criar/Modificar
-
-### Novos Arquivos
-
-1. `src/pages/admin/ContentDetail.tsx` - Pagina de detalhes (admin)
-2. `src/pages/portal/ContentDetail.tsx` - Pagina de detalhes (cliente)
-3. `src/hooks/useEditorialContentComments.ts` - Hook para comentarios
-4. `src/components/calendar/ContentListView.tsx` - Visualizacao em lista
-
-### Arquivos Modificados
-
-1. `src/App.tsx` - Novas rotas
-2. `src/pages/admin/Calendar.tsx` - Toggle lista/calendario
-3. `src/pages/portal/Calendar.tsx` - Toggle lista/calendario
-4. `src/components/calendar/CalendarView.tsx` - Click navega para pagina
-5. `supabase/functions/generate-content/index.ts` - Adicionar subtitulo
-
----
-
-## Detalhes Tecnicos
-
-### Migracao de Banco de Dados
-
-```sql
--- Adicionar subtitulo
-ALTER TABLE ai_generated_contents 
-ADD COLUMN subtitle text;
-
--- Tabela de comentarios
-CREATE TABLE editorial_content_comments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  editorial_content_id uuid REFERENCES editorial_contents(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  content text NOT NULL,
-  parent_comment_id uuid REFERENCES editorial_content_comments(id),
-  created_at timestamptz DEFAULT now()
-);
-
--- Tabela de reacoes
-CREATE TABLE editorial_content_reactions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  comment_id uuid REFERENCES editorial_content_comments(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  reaction_type text NOT NULL CHECK (reaction_type IN ('like','heart','celebrate','thinking')),
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(comment_id, user_id, reaction_type)
-);
-
--- Indexes
-CREATE INDEX idx_editorial_comments_content ON editorial_content_comments(editorial_content_id);
-CREATE INDEX idx_editorial_comments_parent ON editorial_content_comments(parent_comment_id);
-
--- RLS policies para comentarios e reacoes
-```
-
-### Atualizacao do Prompt da IA
-
-Para posts de Instagram, o formato JSON retornado incluira:
-
-```json
-{
-  "title": "Titulo Principal",
-  "subtitle": "Subtitulo para o Designer",
-  "content": "Legenda completa...",
-  "hashtags": [...],
-  "image_suggestions": [...]
-}
-```
-
----
-
-## Sugestoes Adicionais
-
-1. **Notificacoes**: Alertar usuarios quando receberem comentarios em seus conteudos
-2. **Historico de Alteracoes**: Log de quem editou o que e quando
-3. **Anexos**: Permitir upload de imagens/arquivos nos comentarios
-4. **Mencoes**: Marcar usuarios com @ nos comentarios
-5. **Preview Mobile**: Simular como o post ficaria no Instagram/Facebook
-
+Quer que eu comece pela implementação do **Meta Ads Dashboard** (mais simples, similar ao Google Ads) ou pelo **Sistema de Agendamento de Posts**?
