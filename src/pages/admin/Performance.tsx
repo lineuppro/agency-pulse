@@ -8,12 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   TrendingUp, TrendingDown, DollarSign, Target, MousePointer, 
   BarChart3, RefreshCw, Eye, MousePointerClick, AlertTriangle,
-  Lightbulb, Minus, Search, Hash
+  Lightbulb, Minus, Search, Hash, Users, Radio
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useGoogleAdsDetailed, DateRange, KeywordData, Opportunity, Alert } from '@/hooks/useGoogleAdsDetailed';
+import { useMetaAdsMetrics, DateRange as MetaDateRange } from '@/hooks/useMetaAdsMetrics';
 import { useToast } from '@/hooks/use-toast';
-
+import { MetaAdsCard } from '@/components/meta/MetaAdsCard';
 interface Client {
   id: string;
   name: string;
@@ -67,7 +68,16 @@ export default function AdminPerformance() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [dateRange, setDateRange] = useState<DateRange>('LAST_30_DAYS');
   const [loadingClients, setLoadingClients] = useState(true);
+  const [activeTab, setActiveTab] = useState<'google' | 'meta'>('google');
   const { data, loading, error, fetchDetailedData } = useGoogleAdsDetailed();
+  const { 
+    metrics: metaMetrics, 
+    campaigns: metaCampaigns, 
+    configured: metaConfigured, 
+    loading: metaLoading, 
+    error: metaError, 
+    fetchMetrics: fetchMetaMetrics 
+  } = useMetaAdsMetrics();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -100,13 +110,21 @@ export default function AdminPerformance() {
 
   useEffect(() => {
     if (selectedClientId) {
-      fetchDetailedData(selectedClientId, dateRange);
+      if (activeTab === 'google') {
+        fetchDetailedData(selectedClientId, dateRange);
+      } else {
+        fetchMetaMetrics(selectedClientId, dateRange as MetaDateRange);
+      }
     }
-  }, [selectedClientId, dateRange]);
+  }, [selectedClientId, dateRange, activeTab]);
 
   const handleRefresh = () => {
     if (selectedClientId) {
-      fetchDetailedData(selectedClientId, dateRange);
+      if (activeTab === 'google') {
+        fetchDetailedData(selectedClientId, dateRange);
+      } else {
+        fetchMetaMetrics(selectedClientId, dateRange as MetaDateRange);
+      }
     }
   };
 
@@ -171,8 +189,30 @@ export default function AdminPerformance() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Performance</h1>
           <p className="text-muted-foreground mt-1">
-            Métricas completas do Google Ads
+            Métricas de tráfego pago
           </p>
+        </div>
+
+        {/* Platform Toggle */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+          <Button
+            variant={activeTab === 'google' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('google')}
+            className="gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Google Ads
+          </Button>
+          <Button
+            variant={activeTab === 'meta' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('meta')}
+            className="gap-2"
+          >
+            <Radio className="h-4 w-4" />
+            Meta Ads
+          </Button>
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
@@ -210,22 +250,22 @@ export default function AdminPerformance() {
             variant="outline" 
             size="icon" 
             onClick={handleRefresh} 
-            disabled={loading || !selectedClientId}
+            disabled={(loading || metaLoading) || !selectedClientId}
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${(loading || metaLoading) ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
 
-      {/* Alerts */}
-      {data?.alerts && data.alerts.length > 0 && (
+      {/* Alerts - Google Ads only */}
+      {activeTab === 'google' && data?.alerts && data.alerts.length > 0 && (
         <div className="space-y-2">
           {data.alerts.map((alert, i) => (
             <Card key={i} className={`${getSeverityColor(alert.severity)}`}>
               <CardContent className="py-3 flex items-center gap-3">
                 <AlertTriangle className={`h-5 w-5 ${
-                  alert.severity === 'critical' ? 'text-red-500' :
-                  alert.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'
+                  alert.severity === 'critical' ? 'text-destructive' :
+                  alert.severity === 'warning' ? 'text-warning' : 'text-primary'
                 }`} />
                 <div>
                   <p className="font-medium text-sm">{alert.title}</p>
@@ -246,24 +286,35 @@ export default function AdminPerformance() {
               Selecione um cliente
             </h3>
             <p className="text-sm text-muted-foreground text-center">
-              Escolha um cliente acima para visualizar as métricas do Google Ads
+              Escolha um cliente acima para visualizar as métricas
             </p>
           </CardContent>
         </Card>
       )}
 
       {/* No Google Ads Warning */}
-      {selectedClientId && selectedClient && !selectedClient.google_ads_id && (
-        <Card className="border-yellow-500/50 bg-yellow-500/10">
+      {activeTab === 'google' && selectedClientId && selectedClient && !selectedClient.google_ads_id && (
+        <Card className="border-warning/50 bg-warning/10">
           <CardContent className="py-4">
-            <p className="text-sm text-yellow-600">
+            <p className="text-sm text-warning">
               O cliente <strong>{selectedClient.name}</strong> não possui ID do Google Ads configurado.
             </p>
           </CardContent>
         </Card>
       )}
 
-      {error && (
+      {/* Meta Ads Not Configured Warning */}
+      {activeTab === 'meta' && selectedClientId && metaConfigured === false && (
+        <Card className="border-warning/50 bg-warning/10">
+          <CardContent className="py-4">
+            <p className="text-sm text-warning">
+              O cliente <strong>{selectedClient?.name}</strong> não possui Meta Ads configurado.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && activeTab === 'google' && (
         <Card className="border-destructive/50 bg-destructive/10">
           <CardContent className="py-4">
             <p className="text-sm text-destructive">{error}</p>
@@ -271,7 +322,138 @@ export default function AdminPerformance() {
         </Card>
       )}
 
-      {selectedClientId && selectedClient?.google_ads_id && (
+      {metaError && activeTab === 'meta' && (
+        <Card className="border-destructive/50 bg-destructive/10">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{metaError}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Meta Ads Content */}
+      {activeTab === 'meta' && selectedClientId && metaConfigured && (
+        <>
+          {/* Meta Metrics Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <MetaAdsCard
+              title="Gasto Total"
+              value={metaMetrics ? formatCurrency(metaMetrics.spend) : '-'}
+              icon={DollarSign}
+              description="Investimento no período"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="ROAS"
+              value={metaMetrics ? formatNumber(metaMetrics.roas, 2) + 'x' : '-'}
+              icon={TrendingUp}
+              description="Retorno sobre investimento"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="Alcance"
+              value={metaMetrics ? formatNumber(metaMetrics.reach) : '-'}
+              icon={Users}
+              description="Pessoas alcançadas"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="Impressões"
+              value={metaMetrics ? formatNumber(metaMetrics.impressions) : '-'}
+              icon={Eye}
+              description="Total de impressões"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="Cliques"
+              value={metaMetrics ? formatNumber(metaMetrics.clicks) : '-'}
+              icon={MousePointerClick}
+              description="Total de cliques"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="CPC"
+              value={metaMetrics ? formatCurrency(metaMetrics.cpc) : '-'}
+              icon={DollarSign}
+              description="Custo por clique"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="CPM"
+              value={metaMetrics ? formatCurrency(metaMetrics.cpm) : '-'}
+              icon={DollarSign}
+              description="Custo por mil impressões"
+              loading={metaLoading}
+            />
+            <MetaAdsCard
+              title="CTR"
+              value={metaMetrics ? formatPercent(metaMetrics.ctr) : '-'}
+              icon={BarChart3}
+              description="Taxa de cliques"
+              loading={metaLoading}
+            />
+          </div>
+
+          {/* Meta Campaigns Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Campanhas Meta Ads</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {metaLoading ? (
+                <div className="space-y-2">
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} className="h-12 animate-pulse bg-muted rounded" />
+                  ))}
+                </div>
+              ) : metaCampaigns && metaCampaigns.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campanha</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Gasto</TableHead>
+                      <TableHead className="text-right">Cliques</TableHead>
+                      <TableHead className="text-right">Conv.</TableHead>
+                      <TableHead className="text-right">ROAS</TableHead>
+                      <TableHead className="text-right">CPA</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {metaCampaigns.map((campaign, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium max-w-[250px] truncate">
+                          {campaign.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={campaign.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                            {campaign.status === 'ACTIVE' ? 'Ativo' : campaign.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(campaign.spend)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(campaign.conversions)}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={campaign.roas >= 2 ? 'text-success' : campaign.roas >= 1 ? 'text-warning' : 'text-destructive'}>
+                            {formatNumber(campaign.roas, 2)}x
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(campaign.cpa)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  Nenhuma campanha encontrada no período
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Google Ads Content */}
+      {activeTab === 'google' && selectedClientId && selectedClient?.google_ads_id && (
         <>
           {/* Metrics Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -26,3 +26,12 @@ verify_jwt = false
 
 [functions.generate-content]
 verify_jwt = false
+
+[functions.meta-auth]
+verify_jwt = false
+
+[functions.meta-publish]
+verify_jwt = false
+
+[functions.meta-ads-metrics]
+verify_jwt = false
