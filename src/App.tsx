@@ -29,6 +29,7 @@ import AdminMeetingAgenda from "./pages/admin/MeetingAgenda";
 import AdminCalendar from "./pages/admin/Calendar";
 import AdminContentCreation from "./pages/admin/ContentCreation";
 import AdminContentDetail from "./pages/admin/ContentDetail";
+import AdminSocialMedia from "./pages/admin/SocialMedia";
 
 // Client Portal Pages
 import MeetingAgenda from "./pages/portal/MeetingAgenda";
@@ -67,6 +68,7 @@ const App = () => (
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="tasks" element={<AdminTasks />} />
                 <Route path="performance" element={<AdminPerformance />} />
+                <Route path="social-media" element={<AdminSocialMedia />} />
                 <Route path="files" element={<AdminFiles />} />
                 <Route path="calendar" element={<AdminCalendar />} />
                 <Route path="calendar/:contentId" element={<AdminContentDetail />} />
