@@ -1,211 +1,286 @@
 
 
-# Plano: Melhorias do Calendário Editorial
+# Plano: Sistema de Agendamento de Posts para Redes Sociais
 
-## Visao Geral
+## Esclarecimento Importante: Como Funciona a Conexão
 
-Este plano implementa melhorias significativas no sistema de Calendário Editorial, criando uma experiencia mais completa e colaborativa para administradores, designers e clientes.
+Você mencionou que no mLabs é só colocar usuário e senha do Instagram. **Infelizmente, isso não é mais possível com a API oficial do Meta.**
+
+### Por que não posso usar usuário/senha?
+
+A Meta (Facebook/Instagram) **não permite** que apps de terceiros coletem login/senha dos usuários. Isso é proibido por:
+- Termos de Uso da Meta
+- Segurança (evitar roubo de credenciais)
+- Conformidade com GDPR/LGPD
+
+O mLabs e outras ferramentas usam o **fluxo OAuth** por trás dos panos - quando você clica "conectar Instagram", ele redireciona para o Facebook onde você faz login e autoriza o app.
+
+### O que precisamos usar
+
+**Facebook Login + Graph API** = Método oficial e obrigatório
+- Usuário clica "Conectar Instagram/Facebook"
+- Redireciona para página do Facebook para autenticação
+- Usuário autoriza as permissões necessárias
+- Sistema recebe um **Access Token** para publicar em nome do usuário
 
 ---
 
-## 1. Nova Pagina de Detalhes do Conteudo
+## Requisitos do Meta App
 
-Substituir o sidebar atual por uma pagina dedicada (`/admin/calendar/:contentId` e `/portal/calendar/:contentId`) com layout mais espacoso.
+Já temos os secrets configurados:
+- `META_APP_ID` ✓
+- `META_APP_SECRET` ✓
 
-### Layout da Pagina
+### Permissões Necessárias no Meta for Developers
+
+Para publicar posts, precisamos solicitar (no console do Meta for Developers):
+- `pages_manage_posts` - Publicar no Facebook
+- `pages_read_engagement` - Ler informações da página
+- `instagram_basic` - Informações básicas do Instagram
+- `instagram_content_publish` - Publicar no Instagram
+
+**Importante:** Para produção, o app precisa passar por App Review da Meta.
+
+---
+
+## Arquitetura da Solução
 
 ```text
-+------------------------------------------------------------------+
-|  [<] Voltar ao Calendario    Status: [Rascunho v]    [Acoes v]   |
-+------------------------------------------------------------------+
-|                                                                   |
-|  +-------------------+  +--------------------------------------+  |
-|  | INFO BASICAS      |  | CONTEUDO COMPLETO                    | |
-|  | Instagram Post    |  | (area de leitura do artigo/post)     | |
-|  | Cliente: Empresa  |  |                                       | |
-|  | Data: 17/02/2026  |  | Titulo: LinkedIn 2026: Venda Mais!   | |
-|  | Campanha: ...     |  | Subtitulo: Dicas para...             | |
-|  +-------------------+  |                                       | |
-|                         | [Conteudo gerado pela IA aqui]        | |
-|  +-------------------+  |                                       | |
-|  | METRICAS SEO      |  +--------------------------------------+ |
-|  | Score: 72         |  |                                       | |
-|  | Palavras: 1500    |  | +----------------------------------+   | |
-|  | Densidade: 1.5%   |  | | COMENTARIOS E OBSERVACOES        |  | |
-|  +-------------------+  | | (sistema de threads)              |  | |
-|                         | +----------------------------------+   | |
-|  +-------------------+  |                                       | |
-|  | HASHTAGS          |  |                                       | |
-|  | #marketing #...   |  |                                       | |
-|  +-------------------+  +--------------------------------------+ |
-+------------------------------------------------------------------+
-```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        ADMIN PANEL                                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   /admin/social-media (NOVA PÁGINA)                                     │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  Gerenciar Conexões de Mídias Sociais                           │   │
+│   │                                                                  │   │
+│   │  [Selector: Cliente] ▼                                          │   │
+│   │                                                                  │   │
+│   │  ┌──────────────────┐  ┌──────────────────┐                     │   │
+│   │  │  Instagram       │  │  Facebook        │                     │   │
+│   │  │  @perfil_cliente │  │  Página FB       │                     │   │
+│   │  │  [Conectado] ✓   │  │  [Conectado] ✓   │                     │   │
+│   │  │  [Desconectar]   │  │  [Desconectar]   │                     │   │
+│   │  └──────────────────┘  └──────────────────┘                     │   │
+│   │                                                                  │   │
+│   │  OU (se não conectado):                                         │   │
+│   │  [Conectar Instagram/Facebook]                                  │   │
+│   │  → Redireciona para OAuth do Meta                               │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 
-### Componentes
-
-- **Header**: Navegacao, seletor de status, menu de acoes (editar, excluir)
-- **Painel Esquerdo**: Informacoes basicas, metricas SEO, hashtags, sugestoes de imagem
-- **Painel Direito**: Conteudo completo (legivel), sistema de comentarios
-
----
-
-## 2. Sistema de Comentarios para Conteudo Editorial
-
-Criar tabela e logica para comentarios no conteudo editorial (similar ao sistema de tasks).
-
-### Nova Tabela: `editorial_content_comments`
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | Chave primaria |
-| editorial_content_id | uuid | FK para editorial_contents |
-| user_id | uuid | Quem comentou |
-| content | text | Texto do comentario |
-| parent_comment_id | uuid | Para replies (threads) |
-| created_at | timestamp | Data de criacao |
-
-### Nova Tabela: `editorial_content_reactions`
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | Chave primaria |
-| comment_id | uuid | FK para editorial_content_comments |
-| user_id | uuid | Quem reagiu |
-| reaction_type | text | like, heart, celebrate, thinking |
-
-### Funcionalidades
-
-- Comentarios com threads (respostas aninhadas)
-- Reacoes com emojis
-- Visivel para Admin, Designer e Cliente
-- Log de atividade para historico
-
----
-
-## 3. Visualizacao em Lista
-
-Nova aba ou toggle no calendario para visualizacao em lista de todos os conteudos.
-
-### Colunas da Lista
-
-| Data | Status | Tipo | Titulo | Cliente | Comentarios | Acoes |
-|------|--------|------|--------|---------|-------------|-------|
-| 17/02 | Rascunho | Instagram | LinkedIn 2026 | Empresa X | 3 | [Ver] |
-
-### Recursos
-
-- Ordenacao por data, status, tipo
-- Filtros rapidos
-- Badge com contagem de comentarios
-- Clique leva para pagina de detalhes
-
----
-
-## 4. Subtitulo para Posts Instagram
-
-Adicionar campo `subtitle` gerado pela IA para posts de redes sociais.
-
-### Alteracoes
-
-1. **Banco de Dados**: Adicionar coluna `subtitle` em `ai_generated_contents`
-2. **Edge Function**: Atualizar prompt para gerar subtitulo
-3. **Interface**: Exibir subtitulo na pagina de detalhes e formulario
-
----
-
-## 5. Roles e Permissoes
-
-### Visibilidade por Role
-
-| Funcionalidade | Admin | Designer | Cliente |
-|---------------|-------|----------|---------|
-| Criar conteudo | Sim | Nao | Nao |
-| Editar conteudo | Sim | Nao | Nao |
-| Comentar | Sim | Sim | Sim |
-| Aprovar/Rejeitar | Sim | Nao | Sim |
-| Ver metricas SEO | Sim | Sim | Nao |
-| Ver sugestoes imagem | Sim | Sim | Nao |
-
-**Nota**: Designers sao usuarios admin, entao terao acesso completo. Clientes verao uma versao simplificada focada em aprovacao e feedback.
-
----
-
-## Arquivos a Criar/Modificar
-
-### Novos Arquivos
-
-1. `src/pages/admin/ContentDetail.tsx` - Pagina de detalhes (admin)
-2. `src/pages/portal/ContentDetail.tsx` - Pagina de detalhes (cliente)
-3. `src/hooks/useEditorialContentComments.ts` - Hook para comentarios
-4. `src/components/calendar/ContentListView.tsx` - Visualizacao em lista
-
-### Arquivos Modificados
-
-1. `src/App.tsx` - Novas rotas
-2. `src/pages/admin/Calendar.tsx` - Toggle lista/calendario
-3. `src/pages/portal/Calendar.tsx` - Toggle lista/calendario
-4. `src/components/calendar/CalendarView.tsx` - Click navega para pagina
-5. `supabase/functions/generate-content/index.ts` - Adicionar subtitulo
-
----
-
-## Detalhes Tecnicos
-
-### Migracao de Banco de Dados
-
-```sql
--- Adicionar subtitulo
-ALTER TABLE ai_generated_contents 
-ADD COLUMN subtitle text;
-
--- Tabela de comentarios
-CREATE TABLE editorial_content_comments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  editorial_content_id uuid REFERENCES editorial_contents(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  content text NOT NULL,
-  parent_comment_id uuid REFERENCES editorial_content_comments(id),
-  created_at timestamptz DEFAULT now()
-);
-
--- Tabela de reacoes
-CREATE TABLE editorial_content_reactions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  comment_id uuid REFERENCES editorial_content_comments(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  reaction_type text NOT NULL CHECK (reaction_type IN ('like','heart','celebrate','thinking')),
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(comment_id, user_id, reaction_type)
-);
-
--- Indexes
-CREATE INDEX idx_editorial_comments_content ON editorial_content_comments(editorial_content_id);
-CREATE INDEX idx_editorial_comments_parent ON editorial_content_comments(parent_comment_id);
-
--- RLS policies para comentarios e reacoes
-```
-
-### Atualizacao do Prompt da IA
-
-Para posts de Instagram, o formato JSON retornado incluira:
-
-```json
-{
-  "title": "Titulo Principal",
-  "subtitle": "Subtitulo para o Designer",
-  "content": "Legenda completa...",
-  "hashtags": [...],
-  "image_suggestions": [...]
-}
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     FLUXO DE AGENDAMENTO                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. Admin cria conteúdo no Calendário Editorial                         │
+│  2. Ao aprovar, opção "Agendar para Publicação"                         │
+│  3. Abre modal para:                                                    │
+│     - Selecionar plataformas (Instagram, Facebook)                      │
+│     - Upload de mídia (imagem/vídeo)                                    │
+│     - Definir legenda + hashtags                                        │
+│     - Escolher data/hora de publicação                                  │
+│  4. Post é salvo em `scheduled_posts`                                   │
+│  5. Cron job publica automaticamente na hora agendada                   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Sugestoes Adicionais
+## Tabelas do Banco de Dados
 
-1. **Notificacoes**: Alertar usuarios quando receberem comentarios em seus conteudos
-2. **Historico de Alteracoes**: Log de quem editou o que e quando
-3. **Anexos**: Permitir upload de imagens/arquivos nos comentarios
-4. **Mencoes**: Marcar usuarios com @ nos comentarios
-5. **Preview Mobile**: Simular como o post ficaria no Instagram/Facebook
+### Tabela: `social_connections` (conexões por cliente)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| id | uuid | Identificador único |
+| client_id | uuid | FK para clients |
+| platform | enum | 'instagram', 'facebook', 'linkedin' |
+| access_token | text | Token OAuth (criptografado) |
+| refresh_token | text | Para renovar o token |
+| token_expires_at | timestamptz | Quando expira |
+| platform_user_id | text | ID do usuário na plataforma |
+| platform_username | text | @username ou nome da página |
+| page_id | text | ID da página (Facebook) |
+| created_at | timestamptz | - |
+| updated_at | timestamptz | - |
+
+### Tabela: `scheduled_posts` (posts agendados)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| id | uuid | Identificador único |
+| client_id | uuid | FK para clients |
+| editorial_content_id | uuid | FK para editorial_contents (opcional) |
+| platform | enum | 'instagram', 'facebook' |
+| post_type | enum | 'image', 'carousel', 'video', 'story', 'reel' |
+| media_urls | jsonb | Array de URLs das mídias |
+| caption | text | Legenda do post |
+| hashtags | text[] | Hashtags separadas |
+| scheduled_at | timestamptz | Data/hora para publicar |
+| published_at | timestamptz | Quando foi publicado |
+| status | enum | 'scheduled', 'publishing', 'published', 'failed' |
+| platform_post_id | text | ID do post após publicação |
+| error_message | text | Mensagem de erro (se falhou) |
+| created_by | uuid | Quem agendou |
+| created_at | timestamptz | - |
+
+---
+
+## Edge Functions
+
+### 1. `social-auth` - Fluxo OAuth
+- **Ação `init`**: Gera URL de autorização do Meta
+- **Ação `callback`**: Recebe code, troca por access_token, salva conexão
+- **Ação `select-page`**: Quando usuário tem múltiplas páginas, permite escolher
+
+### 2. `social-publish` - Publicar Post
+- Recebe post_id ou dados do post
+- Busca token da conexão do cliente
+- Chama Graph API para publicar:
+  - Instagram: /media → /media_publish
+  - Facebook: /photos ou /feed
+- Atualiza status do post
+
+### 3. `social-scheduler` (Cron Job)
+- Roda a cada 5 minutos
+- Busca posts com `scheduled_at <= now()` e `status = 'scheduled'`
+- Publica cada post via `social-publish`
+- Atualiza status
+
+---
+
+## Componentes do Frontend
+
+### Novos Componentes
+
+1. **`/admin/social-media`** - Página de gerenciamento
+   - Lista conexões por cliente
+   - Botão para conectar novas plataformas
+   - Status de cada conexão
+
+2. **`SocialConnectButton`** - Botão de conexão
+   - Inicia fluxo OAuth
+   - Mostra modal de seleção se múltiplas páginas
+
+3. **`SchedulePostModal`** - Modal de agendamento
+   - Upload de mídia
+   - Editor de legenda
+   - Seletor de plataformas
+   - Picker de data/hora
+
+4. **`ScheduledPostsList`** - Lista de posts agendados
+   - Grid/tabela de posts
+   - Ações: editar, cancelar, publicar agora
+
+---
+
+## Fluxo de Conexão (Detalhado)
+
+```text
+USUÁRIO                     FRONTEND                      EDGE FUNCTION                  META API
+   │                           │                               │                            │
+   │  Clica "Conectar"         │                               │                            │
+   │ ────────────────────────> │                               │                            │
+   │                           │  social-auth (init)           │                            │
+   │                           │ ────────────────────────────> │                            │
+   │                           │                               │  Gera URL OAuth            │
+   │                           │ <──────────────────────────── │                            │
+   │  Redireciona para Meta    │                               │                            │
+   │ <──────────────────────── │                               │                            │
+   │                           │                               │                            │
+   │  Faz login no Facebook    │                               │                            │
+   │ ──────────────────────────────────────────────────────────────────────────────────────>│
+   │                           │                               │                            │
+   │  Autoriza permissões      │                               │                            │
+   │ ──────────────────────────────────────────────────────────────────────────────────────>│
+   │                           │                               │                            │
+   │  Redirect com code        │                               │                            │
+   │ <──────────────────────────────────────────────────────────────────────────────────────│
+   │                           │                               │                            │
+   │  Chega em /admin/social-media?code=XXX                    │                            │
+   │ ────────────────────────> │                               │                            │
+   │                           │  social-auth (callback)       │                            │
+   │                           │ ────────────────────────────> │                            │
+   │                           │                               │  Troca code por token      │
+   │                           │                               │ ──────────────────────────>│
+   │                           │                               │  Access Token              │
+   │                           │                               │ <──────────────────────────│
+   │                           │                               │  Busca páginas do usuário  │
+   │                           │                               │ ──────────────────────────>│
+   │                           │                               │  Lista de páginas          │
+   │                           │                               │ <──────────────────────────│
+   │                           │  Se múltiplas páginas:        │                            │
+   │                           │  retorna lista para seleção   │                            │
+   │                           │ <──────────────────────────── │                            │
+   │  Seleciona página         │                               │                            │
+   │ ────────────────────────> │                               │                            │
+   │                           │  social-auth (select-page)    │                            │
+   │                           │ ────────────────────────────> │                            │
+   │                           │                               │  Salva conexão no banco    │
+   │                           │ <──────────────────────────── │                            │
+   │  Conexão salva! ✓         │                               │                            │
+   │ <──────────────────────── │                               │                            │
+```
+
+---
+
+## Ordem de Implementação
+
+### Fase 1: Infraestrutura (Base)
+1. Criar tabelas `social_connections` e `scheduled_posts` com RLS
+2. Criar edge function `social-auth` com fluxo OAuth
+3. Criar página `/admin/social-media` básica
+
+### Fase 2: Conexão de Contas
+4. Implementar `SocialConnectButton` com OAuth
+5. Adicionar modal de seleção de página
+6. Testar conexão end-to-end
+
+### Fase 3: Agendamento de Posts
+7. Criar `SchedulePostModal` com upload de mídia
+8. Implementar edge function `social-publish`
+9. Integrar com Calendário Editorial
+
+### Fase 4: Publicação Automática
+10. Criar cron job `social-scheduler`
+11. Adicionar lista de posts agendados
+12. Implementar ações (editar, cancelar, republicar)
+
+---
+
+## Configuração Necessária no Meta for Developers
+
+Antes de começar, você precisa configurar no console do Meta:
+
+1. **App Settings > Basic**
+   - Adicionar domínio: `macservices.lovable.app`
+
+2. **Facebook Login > Settings**
+   - Valid OAuth Redirect URIs:
+     ```
+     https://vsqlwyabgfccszqycmto.supabase.co/functions/v1/social-auth
+     ```
+
+3. **Permissions**
+   - Solicitar: `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `pages_read_engagement`
+
+4. **App Mode**
+   - Para testes: adicionar usuários como Testers
+   - Para produção: submeter para App Review
+
+---
+
+## Resumo
+
+| Item | Status |
+|------|--------|
+| Meta App configurado | ✓ Secrets existem |
+| OAuth será via redirect | Método oficial |
+| Múltiplos clientes | ✓ Cada cliente terá sua conexão |
+| Múltiplas páginas | ✓ Modal de seleção |
+| Instagram + Facebook | ✓ Ambos suportados |
+| LinkedIn (futuro) | Arquitetura preparada |
 
