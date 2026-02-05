@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -177,7 +176,7 @@ async function fetchGoogleAdsMetrics(customerId: string, accessToken: string, da
   };
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   console.log('=== google-ads-metrics function invoked ===');
   console.log('Method:', req.method);
   console.log('Headers:', Object.fromEntries(req.headers.entries()));
