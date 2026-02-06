@@ -76,7 +76,7 @@ export function SchedulePostModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filter only Instagram and Facebook connections
-  const availableConnections = connections.filter(
+  const availableConnections = (connections ?? []).filter(
     (c) => c.platform === 'instagram' || c.platform === 'facebook'
   );
 

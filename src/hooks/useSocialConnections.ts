@@ -33,7 +33,7 @@ export function useSocialConnections(clientId: string | null) {
   const queryClient = useQueryClient();
 
   // Fetch connections for a client
-  const { data: connections, isLoading, error } = useQuery({
+  const { data: connections = [], isLoading, error } = useQuery({
     queryKey: ["social-connections", clientId],
     queryFn: async () => {
       if (!clientId) return [];
