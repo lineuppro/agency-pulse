@@ -23,18 +23,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // FIRST check for existing session before setting up listener
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserRole(session.user.id).finally(() => {
+          setInitialized(true);
+        });
+      } else {
+        setLoading(false);
+        setInitialized(true);
+      }
+    });
+
+    // THEN set up auth state listener for future changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, newSession) => {
+        // Only process if we're already initialized to avoid race conditions
+        if (!initialized && event === 'INITIAL_SESSION') {
+          return; // Skip initial session event, we handle it above
+        }
+        
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
         
         // Defer role fetching with setTimeout to avoid deadlock
-        if (session?.user) {
+        if (newSession?.user) {
           setTimeout(() => {
-            fetchUserRole(session.user.id);
+            fetchUserRole(newSession.user.id);
           }, 0);
         } else {
           setRole(null);
@@ -44,20 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
     return () => subscription.unsubscribe();
-  }, []);
+  }, [initialized]);
 
   const fetchUserRole = async (userId: string) => {
     try {
