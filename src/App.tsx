@@ -30,6 +30,7 @@ import AdminCalendar from "./pages/admin/Calendar";
 import AdminContentCreation from "./pages/admin/ContentCreation";
 import AdminContentDetail from "./pages/admin/ContentDetail";
 import AdminSocialMedia from "./pages/admin/SocialMedia";
+import AdminMetaAds from "./pages/admin/MetaAds";
 
 // Client Portal Pages
 import MeetingAgenda from "./pages/portal/MeetingAgenda";
@@ -73,9 +74,9 @@ const App = () => (
                 <Route path="calendar/:contentId" element={<AdminContentDetail />} />
                 <Route path="content-creation" element={<AdminContentCreation />} />
                 <Route path="social-media" element={<AdminSocialMedia />} />
+                <Route path="meta-ads" element={<AdminMetaAds />} />
                 <Route path="agenda" element={<AdminMeetingAgenda />} />
                 <Route path="chat" element={<AdminChat />} />
-                <Route path="settings" element={<AdminSettings />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
