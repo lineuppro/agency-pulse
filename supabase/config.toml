@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.social-publish]
 verify_jwt = false
+
+[functions.meta-ads-metrics]
+verify_jwt = false
