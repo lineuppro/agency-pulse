@@ -21,7 +21,7 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import AdminClients from "./pages/admin/Clients";
 import AdminUsers from "./pages/admin/Users";
 import AdminTasks from "./pages/admin/Tasks";
-import AdminPerformance from "./pages/admin/Performance";
+import AdminTrafficAds from "./pages/admin/TrafficAds";
 import AdminChat from "./pages/admin/Chat";
 import AdminSettings from "./pages/admin/Settings";
 import AdminFiles from "./pages/admin/Files";
@@ -30,7 +30,6 @@ import AdminCalendar from "./pages/admin/Calendar";
 import AdminContentCreation from "./pages/admin/ContentCreation";
 import AdminContentDetail from "./pages/admin/ContentDetail";
 import AdminSocialMedia from "./pages/admin/SocialMedia";
-import AdminMetaAds from "./pages/admin/MetaAds";
 
 // Client Portal Pages
 import MeetingAgenda from "./pages/portal/MeetingAgenda";
@@ -68,13 +67,12 @@ const App = () => (
                 <Route path="clients" element={<AdminClients />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="tasks" element={<AdminTasks />} />
-                <Route path="performance" element={<AdminPerformance />} />
+                <Route path="traffic-ads" element={<AdminTrafficAds />} />
                 <Route path="files" element={<AdminFiles />} />
                 <Route path="calendar" element={<AdminCalendar />} />
                 <Route path="calendar/:contentId" element={<AdminContentDetail />} />
                 <Route path="content-creation" element={<AdminContentCreation />} />
                 <Route path="social-media" element={<AdminSocialMedia />} />
-                <Route path="meta-ads" element={<AdminMetaAds />} />
                 <Route path="agenda" element={<AdminMeetingAgenda />} />
                 <Route path="chat" element={<AdminChat />} />
                 <Route path="settings" element={<AdminSettings />} />
