@@ -14,7 +14,8 @@ import {
   DollarSign, Eye, Users, MousePointer, TrendingUp, TrendingDown, Target,
   RefreshCw, AlertCircle, Link2, Link2Off, Facebook, BarChart3, 
   MousePointerClick, AlertTriangle, Lightbulb, Minus, Search, Hash,
-  MessageSquare, Send, Loader2, Bot, User, Megaphone
+  MessageSquare, Send, Loader2, Bot, User, Megaphone, ArrowUpRight, ArrowDownRight,
+  Percent, Zap, ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMetaAdsMetrics, useMetaAdsConnection, type MetaDateRange } from '@/hooks/useMetaAdsMetrics';
@@ -44,25 +45,15 @@ const dateRangeOptions: { value: MetaDateRange; googleValue: DateRange; label: s
 ];
 
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
 const formatNumber = (value: number, decimals = 0) => {
-  return new Intl.NumberFormat('pt-BR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value);
 };
 
 const formatPercent = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
+  return `${value.toFixed(2)}%`;
 };
 
 const getQualityScoreBadge = (qs: number | null) => {
@@ -74,71 +65,84 @@ const getQualityScoreBadge = (qs: number | null) => {
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'ACTIVE':
-    case 'ENABLED':
-      return 'bg-success/10 text-success';
-    case 'PAUSED':
-      return 'bg-warning/10 text-warning';
-    default:
-      return 'bg-muted text-muted-foreground';
+    case 'ACTIVE': case 'ENABLED': return 'bg-green-500/15 text-green-600 border-green-500/30';
+    case 'PAUSED': return 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30';
+    default: return 'bg-muted text-muted-foreground';
   }
 };
 
 const getRoasColor = (roas: number) => {
-  if (roas >= 3) return 'text-success';
-  if (roas >= 1) return 'text-warning';
-  return 'text-destructive';
+  if (roas >= 3) return 'text-green-500';
+  if (roas >= 1) return 'text-yellow-500';
+  return 'text-red-500';
 };
 
 const getSeverityColor = (severity: string) => {
   switch (severity) {
-    case 'critical':
-    case 'high':
-      return 'border-red-500/50 bg-red-500/10';
-    case 'warning':
-    case 'medium':
-      return 'border-yellow-500/50 bg-yellow-500/10';
-    default:
-      return 'border-blue-500/50 bg-blue-500/10';
+    case 'critical': case 'high': return 'border-red-500/50 bg-red-500/10';
+    case 'warning': case 'medium': return 'border-yellow-500/50 bg-yellow-500/10';
+    default: return 'border-blue-500/50 bg-blue-500/10';
   }
 };
+
+// Metric card component for cleaner code
+function MetricCard({ 
+  icon: Icon, label, value, subValue, loading, iconColor, valueColor 
+}: { 
+  icon: any; label: string; value: string; subValue?: string; loading: boolean; iconColor?: string; valueColor?: string;
+}) {
+  return (
+    <Card className="border-border/50 relative overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+          <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", iconColor || "bg-primary/10")}>
+            <Icon className={cn("h-4 w-4", iconColor ? "text-inherit" : "text-primary")} />
+          </div>
+        </div>
+        {loading ? (
+          <Skeleton className="h-7 w-24" />
+        ) : (
+          <>
+            <p className={cn("text-xl font-bold", valueColor)}>{value}</p>
+            {subValue && <p className="text-xs text-muted-foreground mt-0.5">{subValue}</p>}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function TrafficAds() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [dateRange, setDateRange] = useState<MetaDateRange>('last_30d');
   const [activeTab, setActiveTab] = useState<'google' | 'meta'>('google');
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   
   // AI Chat state
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const { session } = useAuth();
   const { toast } = useToast();
 
-  // Meta Ads hooks
   const { metrics: metaMetrics, campaigns: metaCampaigns, loading: metaLoading, error: metaError, fetchMetrics: fetchMetaMetrics } = useMetaAdsMetrics();
   const { data: metaConnection, isLoading: isLoadingMetaConnection } = useMetaAdsConnection(selectedClientId);
-
-  // Google Ads hooks
   const { data: googleData, loading: googleLoading, error: googleError, fetchDetailedData: fetchGoogleData } = useGoogleAdsDetailed();
 
-  // Fetch clients
   const { data: clients = [], isLoading: loadingClients } = useQuery({
     queryKey: ['clients-for-traffic-ads'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name, google_ads_id')
-        .order('name');
+      const { data, error } = await supabase.from('clients').select('id, name, google_ads_id').order('name');
       if (error) throw error;
       return data as Client[];
     },
   });
 
-  // Set first client as default
   useEffect(() => {
     if (clients.length > 0 && !selectedClientId) {
       const clientWithAds = clients.find(c => c.google_ads_id);
@@ -146,12 +150,9 @@ export default function TrafficAds() {
     }
   }, [clients, selectedClientId]);
 
-  // Fetch data when client or date range changes
   useEffect(() => {
     if (!selectedClientId) return;
-    
     const googleRange = dateRangeOptions.find(d => d.value === dateRange)?.googleValue || 'LAST_30_DAYS';
-    
     if (activeTab === 'google') {
       fetchGoogleData(selectedClientId, googleRange);
     } else if (metaConnection) {
@@ -161,9 +162,7 @@ export default function TrafficAds() {
 
   const handleRefresh = () => {
     if (!selectedClientId) return;
-    
     const googleRange = dateRangeOptions.find(d => d.value === dateRange)?.googleValue || 'LAST_30_DAYS';
-    
     if (activeTab === 'google') {
       fetchGoogleData(selectedClientId, googleRange);
     } else if (metaConnection) {
@@ -171,24 +170,17 @@ export default function TrafficAds() {
     }
   };
 
-  // AI Chat functionality
-  const scrollToBottom = useCallback(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
+  // AI Chat
   useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages, scrollToBottom]);
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
 
   const sendChatMessage = async () => {
     if (!chatInput.trim() || isChatLoading || !session?.access_token) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: chatInput.trim(),
-    };
-
+    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: chatInput.trim() };
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
     setIsChatLoading(true);
@@ -196,15 +188,12 @@ export default function TrafficAds() {
     let assistantContent = '';
 
     try {
-      // Build context with current ads data
       const currentPlatform = activeTab === 'google' ? 'Google Ads' : 'Meta Ads';
       const currentData = activeTab === 'google' ? googleData : { metrics: metaMetrics, campaigns: metaCampaigns };
       
       const systemContext = `Você é um analista especializado em tráfego pago. O usuário está visualizando dados de ${currentPlatform}.
-      
 Dados atuais do período selecionado:
 ${JSON.stringify(currentData, null, 2)}
-
 Forneça análises detalhadas, insights acionáveis e recomendações de otimização baseadas nos dados. Seja direto e prático.`;
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-rag`, {
@@ -223,13 +212,8 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}`);
-      }
-
-      if (!response.body) {
-        throw new Error('No response body');
-      }
+      if (!response.ok) throw new Error(`Error ${response.status}`);
+      if (!response.body) throw new Error('No response body');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -240,9 +224,7 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
         setChatMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === 'assistant') {
-            return prev.map((m, i) => 
-              i === prev.length - 1 ? { ...m, content: assistantContent } : m
-            );
+            return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantContent } : m);
           }
           return [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: assistantContent }];
         });
@@ -251,21 +233,16 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
-
         let newlineIndex: number;
         while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
           let line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
-
           if (line.endsWith('\r')) line = line.slice(0, -1);
           if (line.startsWith(':') || line.trim() === '') continue;
           if (!line.startsWith('data: ')) continue;
-
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') break;
-
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content;
@@ -278,11 +255,7 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
       }
     } catch (err) {
       console.error('Chat error:', err);
-      toast({
-        title: 'Erro',
-        description: 'Falha ao enviar mensagem para a IA',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: 'Falha ao enviar mensagem para a IA', variant: 'destructive' });
       setChatMessages(prev => prev.filter(m => m.id !== userMessage.id));
     } finally {
       setIsChatLoading(false);
@@ -291,6 +264,7 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
   const googleMetrics = googleData?.metrics;
+  const previousMetrics = googleData?.previousMetrics;
   const loading = activeTab === 'google' ? googleLoading : metaLoading;
   const error = activeTab === 'google' ? googleError : metaError;
 
@@ -308,16 +282,14 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={loadingClients}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Selecione o cliente" />
             </SelectTrigger>
             <SelectContent>
               {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
+                <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -328,31 +300,34 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
             </SelectTrigger>
             <SelectContent>
               {dateRangeOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={loading}
-          >
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </Button>
+
+          <Button
+            variant={showChat ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowChat(!showChat)}
+            className="gap-2"
+          >
+            <Bot className="h-4 w-4" />
+            Análise IA
           </Button>
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Ads Data - 2 columns */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Content */}
+      <div className={cn("grid gap-6", showChat ? "lg:grid-cols-3" : "lg:grid-cols-1")}>
+        {/* Dashboard Content */}
+        <div className={cn(showChat ? "lg:col-span-2" : "lg:col-span-1", "space-y-6")}>
           {/* Platform Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'google' | 'meta')}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
               <TabsTrigger value="google" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Google Ads
@@ -363,9 +338,8 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
               </TabsTrigger>
             </TabsList>
 
-            {/* Google Ads Content */}
+            {/* ==================== GOOGLE ADS ==================== */}
             <TabsContent value="google" className="space-y-6 mt-6">
-              {/* No Google Ads Warning */}
               {selectedClientId && selectedClient && !selectedClient.google_ads_id && (
                 <Card className="border-yellow-500/50 bg-yellow-500/10">
                   <CardContent className="py-4">
@@ -391,10 +365,7 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                   {googleData.alerts.map((alert, i) => (
                     <Card key={i} className={getSeverityColor(alert.severity)}>
                       <CardContent className="py-3 flex items-center gap-3">
-                        <AlertTriangle className={`h-5 w-5 ${
-                          alert.severity === 'critical' ? 'text-red-500' :
-                          alert.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'
-                        }`} />
+                        <AlertTriangle className={`h-5 w-5 ${alert.severity === 'critical' ? 'text-red-500' : alert.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'}`} />
                         <div>
                           <p className="font-medium text-sm">{alert.title}</p>
                           <p className="text-xs text-muted-foreground">{alert.message}</p>
@@ -407,125 +378,195 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
 
               {selectedClient?.google_ads_id && (
                 <>
-                  {/* Metrics Cards */}
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                  {/* Metrics Grid - 6 cards */}
+                  <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+                    <MetricCard icon={DollarSign} label="Investimento" value={formatCurrency(googleMetrics?.spend || 0)} loading={googleLoading} iconColor="bg-blue-500/10 text-blue-500" />
+                    <MetricCard icon={ShoppingCart} label="Conversões" value={formatNumber(googleMetrics?.conversions || 0)} subValue={`Valor: ${formatCurrency(googleMetrics?.conversionsValue || 0)}`} loading={googleLoading} iconColor="bg-green-500/10 text-green-500" />
+                    <MetricCard icon={TrendingUp} label="ROAS" value={`${formatNumber(googleMetrics?.roas || 0, 2)}x`} loading={googleLoading} iconColor="bg-purple-500/10 text-purple-500" valueColor={getRoasColor(googleMetrics?.roas || 0)} />
+                    <MetricCard icon={Target} label="CPA" value={formatCurrency(googleMetrics?.cpa || 0)} loading={googleLoading} iconColor="bg-orange-500/10 text-orange-500" />
+                    <MetricCard icon={MousePointerClick} label="Cliques" value={formatNumber(googleMetrics?.clicks || 0)} subValue={`CTR: ${formatPercent(googleMetrics?.ctr || 0)}`} loading={googleLoading} iconColor="bg-cyan-500/10 text-cyan-500" />
+                    <MetricCard icon={Eye} label="Impressões" value={formatNumber(googleMetrics?.impressions || 0)} subValue={`CPC: ${formatCurrency(googleMetrics?.avgCpc || 0)}`} loading={googleLoading} iconColor="bg-indigo-500/10 text-indigo-500" />
+                  </div>
+
+                  {/* Campaigns + Keywords side by side */}
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Campaigns Table */}
                     <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4" />
-                          ROAS
-                        </CardDescription>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Megaphone className="h-4 w-4 text-primary" />
+                          Campanhas
+                        </CardTitle>
+                        <CardDescription>Performance por campanha</CardDescription>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="p-0">
                         {googleLoading ? (
-                          <Skeleton className="h-8 w-16" />
+                          <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                        ) : googleData?.campaigns && googleData.campaigns.length > 0 ? (
+                          <ScrollArea className="h-[320px]">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Campanha</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead className="text-right">Gasto</TableHead>
+                                  <TableHead className="text-right">Conv.</TableHead>
+                                  <TableHead className="text-right">ROAS</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {googleData.campaigns.map((c, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="font-medium max-w-[150px] truncate text-sm">{c.name}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className={cn('text-xs', getStatusColor(c.status))}>
+                                        {c.status === 'ENABLED' ? 'Ativo' : c.status === 'PAUSED' ? 'Pausado' : c.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm">{formatCurrency(c.spend)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(c.conversions)}</TableCell>
+                                    <TableCell className={cn('text-right text-sm font-semibold', getRoasColor(c.roas))}>{c.roas.toFixed(2)}x</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
                         ) : (
-                          <p className={cn('text-2xl font-bold', getRoasColor(googleMetrics?.roas || 0))}>
-                            {formatNumber(googleMetrics?.roas || 0, 2)}x
-                          </p>
+                          <p className="text-muted-foreground text-center py-8 text-sm">Nenhuma campanha encontrada</p>
                         )}
                       </CardContent>
                     </Card>
 
+                    {/* Keywords Table */}
                     <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <Target className="h-4 w-4" />
-                          CPA
-                        </CardDescription>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Hash className="h-4 w-4 text-primary" />
+                          Top Palavras-chave
+                        </CardTitle>
+                        <CardDescription>Por gasto e conversões</CardDescription>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="p-0">
                         {googleLoading ? (
-                          <Skeleton className="h-8 w-20" />
+                          <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                        ) : googleData?.keywords && googleData.keywords.length > 0 ? (
+                          <ScrollArea className="h-[320px]">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Palavra-chave</TableHead>
+                                  <TableHead className="text-right">Gasto</TableHead>
+                                  <TableHead className="text-right">Cliques</TableHead>
+                                  <TableHead className="text-right">Conv.</TableHead>
+                                  <TableHead className="text-center">QS</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {googleData.keywords.slice(0, 10).map((kw, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="font-medium max-w-[140px] truncate text-sm">{kw.keyword}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatCurrency(kw.spend)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(kw.clicks)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(kw.conversions)}</TableCell>
+                                    <TableCell className="text-center">{getQualityScoreBadge(kw.qualityScore)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
                         ) : (
-                          <p className="text-2xl font-bold">{formatCurrency(googleMetrics?.cpa || 0)}</p>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4" />
-                          Investimento
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {googleLoading ? (
-                          <Skeleton className="h-8 w-24" />
-                        ) : (
-                          <p className="text-2xl font-bold">{formatCurrency(googleMetrics?.spend || 0)}</p>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <MousePointer className="h-4 w-4" />
-                          Conversões
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {googleLoading ? (
-                          <Skeleton className="h-8 w-16" />
-                        ) : (
-                          <p className="text-2xl font-bold">{formatNumber(googleMetrics?.conversions || 0)}</p>
+                          <p className="text-muted-foreground text-center py-8 text-sm">Nenhuma palavra-chave encontrada</p>
                         )}
                       </CardContent>
                     </Card>
                   </div>
 
-                  {/* Keywords Table */}
-                  <Card className="border-border/50">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Hash className="h-5 w-5" />
-                        Top Palavras-chave
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {googleLoading ? (
-                        <div className="space-y-2">
-                          {[1,2,3,4,5].map(i => (
-                            <Skeleton key={i} className="h-12 w-full" />
-                          ))}
-                        </div>
-                      ) : googleData?.keywords && googleData.keywords.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Palavra-chave</TableHead>
-                              <TableHead className="text-right">Gasto</TableHead>
-                              <TableHead className="text-right">Conv.</TableHead>
-                              <TableHead className="text-center">QS</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {googleData.keywords.slice(0, 5).map((kw, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="font-medium max-w-[200px] truncate">
-                                  {kw.keyword}
-                                </TableCell>
-                                <TableCell className="text-right">{formatCurrency(kw.spend)}</TableCell>
-                                <TableCell className="text-right">{formatNumber(kw.conversions)}</TableCell>
-                                <TableCell className="text-center">{getQualityScoreBadge(kw.qualityScore)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-muted-foreground text-center py-4">
-                          Nenhuma palavra-chave encontrada
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
+                  {/* Search Terms + Opportunities */}
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Search Terms */}
+                    <Card className="border-border/50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Search className="h-4 w-4 text-primary" />
+                          Termos de Pesquisa
+                        </CardTitle>
+                        <CardDescription>Termos que geraram conversões</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {googleLoading ? (
+                          <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                        ) : googleData?.searchTerms?.converting && googleData.searchTerms.converting.length > 0 ? (
+                          <ScrollArea className="h-[260px]">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Termo</TableHead>
+                                  <TableHead className="text-right">Cliques</TableHead>
+                                  <TableHead className="text-right">Conv.</TableHead>
+                                  <TableHead className="text-right">Gasto</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {googleData.searchTerms.converting.slice(0, 8).map((st, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="font-medium max-w-[160px] truncate text-sm">{st.searchTerm}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(st.clicks)}</TableCell>
+                                    <TableCell className="text-right text-sm font-semibold text-green-500">{formatNumber(st.conversions)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatCurrency(st.spend)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-8 text-sm">Nenhum termo encontrado</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Opportunities */}
+                    <Card className="border-border/50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Lightbulb className="h-4 w-4 text-yellow-500" />
+                          Oportunidades
+                        </CardTitle>
+                        <CardDescription>Sugestões de otimização</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {googleLoading ? (
+                          <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                        ) : googleData?.opportunities && googleData.opportunities.length > 0 ? (
+                          <ScrollArea className="h-[260px]">
+                            <div className="space-y-3 p-4">
+                              {googleData.opportunities.map((opp, i) => (
+                                <div key={i} className={cn("rounded-lg border p-3", getSeverityColor(opp.severity))}>
+                                  <div className="flex items-start gap-2">
+                                    <Zap className={cn("h-4 w-4 mt-0.5 shrink-0", opp.severity === 'high' ? 'text-red-500' : opp.severity === 'medium' ? 'text-yellow-500' : 'text-blue-500')} />
+                                    <div>
+                                      <p className="text-sm font-medium">{opp.title}</p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">{opp.description}</p>
+                                      {opp.impact && <p className="text-xs font-medium text-primary mt-1">{opp.impact}</p>}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        ) : (
+                          <div className="text-center py-8 text-sm text-muted-foreground">
+                            <Lightbulb className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
+                            Nenhuma oportunidade identificada
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </>
               )}
             </TabsContent>
 
-            {/* Meta Ads Content */}
+            {/* ==================== META ADS ==================== */}
             <TabsContent value="meta" className="space-y-6 mt-6">
               {/* Connection Status */}
               {selectedClientId && (
@@ -541,12 +582,8 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                               <Link2 className="h-5 w-5 text-[#1877F2]" />
                             </div>
                             <div>
-                              <p className="font-medium text-foreground">
-                                {metaConnection.ad_account_name || metaConnection.ad_account_id}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                ID: {metaConnection.ad_account_id}
-                              </p>
+                              <p className="font-medium text-foreground">{metaConnection.ad_account_name || metaConnection.ad_account_id}</p>
+                              <p className="text-sm text-muted-foreground">ID: {metaConnection.ad_account_id}</p>
                             </div>
                           </>
                         ) : (
@@ -556,18 +593,12 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                             </div>
                             <div>
                               <p className="font-medium text-foreground">Conta não conectada</p>
-                              <p className="text-sm text-muted-foreground">
-                                Conecte uma conta Meta Ads
-                              </p>
+                              <p className="text-sm text-muted-foreground">Conecte uma conta Meta Ads</p>
                             </div>
                           </>
                         )}
                       </div>
-
-                      <Button
-                        variant={metaConnection ? 'outline' : 'default'}
-                        onClick={() => setIsConnectModalOpen(true)}
-                      >
+                      <Button variant={metaConnection ? 'outline' : 'default'} onClick={() => setIsConnectModalOpen(true)}>
                         {metaConnection ? 'Gerenciar' : 'Conectar'}
                       </Button>
                     </div>
@@ -586,130 +617,71 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
 
               {metaConnection && (
                 <>
-                  {/* Metrics Cards */}
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4" />
-                          Investimento
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {metaLoading ? (
-                          <Skeleton className="h-8 w-24" />
-                        ) : (
-                          <p className="text-2xl font-bold">{formatCurrency(metaMetrics?.spend || 0)}</p>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          Alcance
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {metaLoading ? (
-                          <Skeleton className="h-8 w-24" />
-                        ) : (
-                          <p className="text-2xl font-bold">{formatNumber(metaMetrics?.reach || 0)}</p>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <Target className="h-4 w-4" />
-                          Conversões
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {metaLoading ? (
-                          <Skeleton className="h-8 w-16" />
-                        ) : (
-                          <p className="text-2xl font-bold">{formatNumber(metaMetrics?.conversions || 0)}</p>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-2">
-                        <CardDescription className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4" />
-                          ROAS
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {metaLoading ? (
-                          <Skeleton className="h-8 w-16" />
-                        ) : (
-                          <p className={cn('text-2xl font-bold', getRoasColor(metaMetrics?.roas || 0))}>
-                            {(metaMetrics?.roas || 0).toFixed(2)}x
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
+                  {/* Metrics Grid - 6 cards */}
+                  <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+                    <MetricCard icon={DollarSign} label="Investimento" value={formatCurrency(metaMetrics?.spend || 0)} loading={metaLoading} iconColor="bg-blue-500/10 text-blue-500" />
+                    <MetricCard icon={Users} label="Alcance" value={formatNumber(metaMetrics?.reach || 0)} subValue={`Impr: ${formatNumber(metaMetrics?.impressions || 0)}`} loading={metaLoading} iconColor="bg-purple-500/10 text-purple-500" />
+                    <MetricCard icon={MousePointerClick} label="Cliques" value={formatNumber(metaMetrics?.clicks || 0)} subValue={`CTR: ${formatPercent(metaMetrics?.ctr || 0)}`} loading={metaLoading} iconColor="bg-cyan-500/10 text-cyan-500" />
+                    <MetricCard icon={DollarSign} label="CPC" value={formatCurrency(metaMetrics?.cpc || 0)} subValue={`CPM: ${formatCurrency(metaMetrics?.cpm || 0)}`} loading={metaLoading} iconColor="bg-orange-500/10 text-orange-500" />
+                    <MetricCard icon={Target} label="Conversões" value={formatNumber(metaMetrics?.conversions || 0)} subValue={`Custo/Res: ${formatCurrency(metaMetrics?.costPerResult || 0)}`} loading={metaLoading} iconColor="bg-green-500/10 text-green-500" />
+                    <MetricCard icon={TrendingUp} label="ROAS" value={`${(metaMetrics?.roas || 0).toFixed(2)}x`} loading={metaLoading} iconColor="bg-indigo-500/10 text-indigo-500" valueColor={getRoasColor(metaMetrics?.roas || 0)} />
                   </div>
 
                   {/* Campaigns Table */}
                   <Card className="border-border/50">
-                    <CardHeader>
-                      <CardTitle>Campanhas</CardTitle>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Megaphone className="h-4 w-4 text-primary" />
+                        Campanhas
+                      </CardTitle>
                       <CardDescription>Performance detalhada por campanha</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-0">
                       {metaLoading ? (
-                        <div className="space-y-3">
-                          {[...Array(5)].map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
-                          ))}
-                        </div>
+                        <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
                       ) : metaCampaigns.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>Nenhuma campanha encontrada</p>
-                        </div>
+                        <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma campanha encontrada</p>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Campanha</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Investimento</TableHead>
-                                <TableHead className="text-right">Cliques</TableHead>
-                                <TableHead className="text-right">ROAS</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {metaCampaigns.slice(0, 5).map((campaign) => (
-                                <TableRow key={campaign.id}>
-                                  <TableCell className="font-medium max-w-[200px] truncate">
-                                    {campaign.name}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge className={cn('font-normal', getStatusColor(campaign.status))}>
-                                      {campaign.status === 'ACTIVE' ? 'Ativo' : 
-                                       campaign.status === 'PAUSED' ? 'Pausado' : campaign.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {formatCurrency(campaign.spend)}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {formatNumber(campaign.clicks)}
-                                  </TableCell>
-                                  <TableCell className={cn('text-right font-medium', getRoasColor(campaign.roas))}>
-                                    {campaign.roas.toFixed(2)}x
-                                  </TableCell>
+                        <ScrollArea className="max-h-[400px]">
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Campanha</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Objetivo</TableHead>
+                                  <TableHead className="text-right">Investimento</TableHead>
+                                  <TableHead className="text-right">Impressões</TableHead>
+                                  <TableHead className="text-right">Cliques</TableHead>
+                                  <TableHead className="text-right">CTR</TableHead>
+                                  <TableHead className="text-right">CPC</TableHead>
+                                  <TableHead className="text-right">Conv.</TableHead>
+                                  <TableHead className="text-right">ROAS</TableHead>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
+                              </TableHeader>
+                              <TableBody>
+                                {metaCampaigns.map((campaign) => (
+                                  <TableRow key={campaign.id}>
+                                    <TableCell className="font-medium max-w-[180px] truncate text-sm">{campaign.name}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className={cn('text-xs', getStatusColor(campaign.status))}>
+                                        {campaign.status === 'ACTIVE' ? 'Ativo' : campaign.status === 'PAUSED' ? 'Pausado' : campaign.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{campaign.objective}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatCurrency(campaign.spend)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(campaign.impressions)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(campaign.clicks)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatPercent(campaign.ctr)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatCurrency(campaign.cpc)}</TableCell>
+                                    <TableCell className="text-right text-sm">{formatNumber(campaign.conversions)}</TableCell>
+                                    <TableCell className={cn('text-right text-sm font-semibold', getRoasColor(campaign.roas))}>{campaign.roas.toFixed(2)}x</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </ScrollArea>
                       )}
                     </CardContent>
                   </Card>
@@ -719,105 +691,99 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
           </Tabs>
         </div>
 
-        {/* AI Chat - 1 column */}
-        <div className="lg:col-span-1">
-          <Card className="border-border/50 h-[600px] flex flex-col">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Bot className="h-5 w-5 text-primary" />
-                Assistente de Análise
-              </CardTitle>
-              <CardDescription>
-                Pergunte sobre suas campanhas de {activeTab === 'google' ? 'Google Ads' : 'Meta Ads'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-0">
-              <ScrollArea className="flex-1 px-4">
-                <div className="space-y-4 py-4">
-                  {chatMessages.length === 0 && (
-                    <div className="text-center py-8">
-                      <MessageSquare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                      <p className="text-sm text-muted-foreground">
-                        Pergunte sobre ROAS, CPA, oportunidades de otimização...
-                      </p>
-                    </div>
-                  )}
-                  {chatMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        'flex gap-3',
-                        message.role === 'user' ? 'justify-end' : 'justify-start'
-                      )}
-                    >
-                      {message.role === 'assistant' && (
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <Bot className="h-4 w-4 text-primary" />
+        {/* AI Chat Panel - fixed height with proper scroll */}
+        {showChat && (
+          <div className="lg:col-span-1">
+            <Card className="border-border/50 sticky top-6" style={{ height: 'calc(100vh - 180px)' }}>
+              <CardHeader className="pb-3 shrink-0">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-primary" />
+                  Assistente IA
+                </CardTitle>
+                <CardDescription>
+                  Analise suas campanhas de {activeTab === 'google' ? 'Google Ads' : 'Meta Ads'}
+                </CardDescription>
+              </CardHeader>
+              <div className="flex flex-col flex-1 overflow-hidden" style={{ height: 'calc(100% - 88px)' }}>
+                {/* Messages area with overflow scroll */}
+                <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4">
+                  <div className="space-y-4 py-2">
+                    {chatMessages.length === 0 && (
+                      <div className="text-center py-8">
+                        <MessageSquare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">
+                          Pergunte sobre ROAS, CPA, oportunidades de otimização...
+                        </p>
+                        <div className="mt-4 space-y-2">
+                          {[
+                            'Qual campanha tem o melhor ROAS?',
+                            'Como otimizar meu CPA?',
+                            'Analise a performance geral',
+                          ].map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              onClick={() => { setChatInput(suggestion); }}
+                              className="block w-full text-left text-xs px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-muted-foreground"
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
                         </div>
-                      )}
-                      <div
-                        className={cn(
-                          'max-w-[85%] rounded-lg px-3 py-2 text-sm',
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        )}
-                      >
-                        <p className="whitespace-pre-wrap">{message.content}</p>
                       </div>
-                      {message.role === 'user' && (
-                        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-                          <User className="h-4 w-4 text-primary-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {isChatLoading && chatMessages[chatMessages.length - 1]?.role === 'user' && (
-                    <div className="flex gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="bg-muted rounded-lg px-3 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </ScrollArea>
-              
-              {/* Chat Input */}
-              <div className="p-4 border-t border-border">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    sendChatMessage();
-                  }}
-                  className="flex gap-2"
-                >
-                  <Input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Pergunte sobre suas campanhas..."
-                    disabled={isChatLoading}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={!chatInput.trim() || isChatLoading}
-                  >
-                    {isChatLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
                     )}
-                  </Button>
-                </form>
+                    {chatMessages.map((message) => (
+                      <div key={message.id} className={cn('flex gap-3', message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                        {message.role === 'assistant' && (
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                            <Bot className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                        )}
+                        <div className={cn(
+                          'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+                          message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                        )}>
+                          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                        </div>
+                        {message.role === 'user' && (
+                          <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
+                            <User className="h-3.5 w-3.5 text-primary-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {isChatLoading && chatMessages[chatMessages.length - 1]?.role === 'user' && (
+                      <div className="flex gap-3">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Bot className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div className="bg-muted rounded-lg px-3 py-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                </div>
+                
+                {/* Chat Input - pinned at bottom */}
+                <div className="p-4 border-t border-border shrink-0">
+                  <form onSubmit={(e) => { e.preventDefault(); sendChatMessage(); }} className="flex gap-2">
+                    <Input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Pergunte sobre suas campanhas..."
+                      disabled={isChatLoading}
+                      className="flex-1"
+                    />
+                    <Button type="submit" size="icon" disabled={!chatInput.trim() || isChatLoading}>
+                      {isChatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </form>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Connect Modal */}
