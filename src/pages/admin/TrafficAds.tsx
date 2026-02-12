@@ -390,25 +390,56 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                     <MetricCard icon={Eye} label="Impressões" value={formatNumber(googleMetrics?.impressions || 0)} subValue={`CPC: ${formatCurrency(googleMetrics?.avgCpc || 0)}`} loading={googleLoading} iconColor="bg-indigo-500/10 text-indigo-500" />
                   </div>
 
-                  {/* Funnel */}
-                  <Card className="border-border/50">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Filter className="h-4 w-4 text-primary" />
-                        Funil de Performance
-                      </CardTitle>
-                      <CardDescription>Impressões → Cliques → Conversões</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <FunnelChart
-                        steps={[
-                          { label: 'Impressões', value: googleMetrics?.impressions || 0, formattedValue: formatNumber(googleMetrics?.impressions || 0), color: 'hsl(var(--primary))' },
-                          { label: 'Cliques', value: googleMetrics?.clicks || 0, formattedValue: formatNumber(googleMetrics?.clicks || 0), color: 'hsl(210, 70%, 50%)' },
-                          { label: 'Conversões', value: googleMetrics?.conversions || 0, formattedValue: formatNumber(googleMetrics?.conversions || 0), color: 'hsl(142, 60%, 45%)' },
-                        ]}
-                      />
-                    </CardContent>
-                  </Card>
+                  {/* Funnel + Keywords side by side */}
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <Card className="border-border/50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Filter className="h-4 w-4 text-primary" />
+                          Funil de Performance
+                        </CardTitle>
+                        <CardDescription>Impressões → Cliques → Conversões</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <FunnelChart
+                          steps={[
+                            { label: 'Impressões', value: googleMetrics?.impressions || 0, formattedValue: formatNumber(googleMetrics?.impressions || 0), color: 'hsl(var(--primary))' },
+                            { label: 'Cliques', value: googleMetrics?.clicks || 0, formattedValue: formatNumber(googleMetrics?.clicks || 0), color: 'hsl(210, 70%, 50%)' },
+                            { label: 'Conversões', value: googleMetrics?.conversions || 0, formattedValue: formatNumber(googleMetrics?.conversions || 0), color: 'hsl(142, 60%, 45%)' },
+                          ]}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-border/50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Hash className="h-4 w-4 text-primary" />
+                          Top Palavras-chave
+                        </CardTitle>
+                        <CardDescription>Por gasto e conversões</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {googleLoading ? (
+                          <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                        ) : (
+                          <DataTable
+                            data={googleData?.keywords || []}
+                            searchPlaceholder="Buscar palavra-chave..."
+                            emptyMessage="Nenhuma palavra-chave encontrada"
+                            maxHeight="320px"
+                            columns={[
+                              { key: 'keyword', label: 'Palavra-chave', minWidth: 160, searchable: true, searchValue: (kw) => kw.keyword, sortValue: (kw) => kw.keyword, render: (kw) => <span className="font-medium" title={kw.keyword}>{kw.keyword}</span> },
+                              { key: 'spend', label: 'Gasto', align: 'right', sortValue: (kw) => kw.spend, render: (kw) => formatCurrency(kw.spend) },
+                              { key: 'clicks', label: 'Cliques', align: 'right', sortValue: (kw) => kw.clicks, render: (kw) => formatNumber(kw.clicks) },
+                              { key: 'conversions', label: 'Conv.', align: 'right', sortValue: (kw) => kw.conversions, render: (kw) => formatNumber(kw.conversions) },
+                              { key: 'qs', label: 'QS', align: 'center', sortValue: (kw) => kw.qualityScore ?? -1, render: (kw) => getQualityScoreBadge(kw.qualityScore) },
+                            ]}
+                          />
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
 
                   {/* Campaigns Table */}
                   <Card className="border-border/50">
@@ -436,36 +467,6 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                             { key: 'ctr', label: 'CTR', align: 'right', sortValue: (c) => c.ctr || 0, render: (c) => formatPercent(c.ctr || 0) },
                             { key: 'conversions', label: 'Conv.', align: 'right', sortValue: (c) => c.conversions, render: (c) => formatNumber(c.conversions) },
                             { key: 'roas', label: 'ROAS', align: 'right', sortValue: (c) => c.roas, render: (c) => <span className={cn('font-semibold', getRoasColor(c.roas))}>{c.roas.toFixed(2)}x</span> },
-                          ]}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Keywords Table */}
-                  <Card className="border-border/50">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Hash className="h-4 w-4 text-primary" />
-                        Top Palavras-chave
-                      </CardTitle>
-                      <CardDescription>Por gasto e conversões</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      {googleLoading ? (
-                        <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                      ) : (
-                        <DataTable
-                          data={googleData?.keywords || []}
-                          searchPlaceholder="Buscar palavra-chave..."
-                          emptyMessage="Nenhuma palavra-chave encontrada"
-                          maxHeight="360px"
-                          columns={[
-                            { key: 'keyword', label: 'Palavra-chave', minWidth: 180, searchable: true, searchValue: (kw) => kw.keyword, sortValue: (kw) => kw.keyword, render: (kw) => <span className="font-medium" title={kw.keyword}>{kw.keyword}</span> },
-                            { key: 'spend', label: 'Gasto', align: 'right', sortValue: (kw) => kw.spend, render: (kw) => formatCurrency(kw.spend) },
-                            { key: 'clicks', label: 'Cliques', align: 'right', sortValue: (kw) => kw.clicks, render: (kw) => formatNumber(kw.clicks) },
-                            { key: 'conversions', label: 'Conv.', align: 'right', sortValue: (kw) => kw.conversions, render: (kw) => formatNumber(kw.conversions) },
-                            { key: 'qs', label: 'QS', align: 'center', sortValue: (kw) => kw.qualityScore ?? -1, render: (kw) => getQualityScoreBadge(kw.qualityScore) },
                           ]}
                         />
                       )}
