@@ -15,8 +15,10 @@ import {
   RefreshCw, AlertCircle, Link2, Link2Off, Facebook, BarChart3, 
   MousePointerClick, AlertTriangle, Lightbulb, Minus, Search, Hash,
   MessageSquare, Send, Loader2, Bot, User, Megaphone, ArrowUpRight, ArrowDownRight,
-  Percent, Zap, ShoppingCart
+  Percent, Zap, ShoppingCart, Filter
 } from 'lucide-react';
+import { DataTable, type DataTableColumn } from '@/components/traffic/DataTable';
+import { FunnelChart } from '@/components/traffic/FunnelChart';
 import { cn } from '@/lib/utils';
 import { useMetaAdsMetrics, useMetaAdsConnection, type MetaDateRange } from '@/hooks/useMetaAdsMetrics';
 import { useGoogleAdsDetailed, DateRange } from '@/hooks/useGoogleAdsDetailed';
@@ -388,100 +390,88 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                     <MetricCard icon={Eye} label="Impressões" value={formatNumber(googleMetrics?.impressions || 0)} subValue={`CPC: ${formatCurrency(googleMetrics?.avgCpc || 0)}`} loading={googleLoading} iconColor="bg-indigo-500/10 text-indigo-500" />
                   </div>
 
-                  {/* Campaigns + Keywords side by side */}
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Campaigns Table */}
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Megaphone className="h-4 w-4 text-primary" />
-                          Campanhas
-                        </CardTitle>
-                        <CardDescription>Performance por campanha</CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        {googleLoading ? (
-                          <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                        ) : googleData?.campaigns && googleData.campaigns.length > 0 ? (
-                          <ScrollArea className="h-[320px]">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Campanha</TableHead>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead className="text-right">Gasto</TableHead>
-                                  <TableHead className="text-right">Conv.</TableHead>
-                                  <TableHead className="text-right">ROAS</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {googleData.campaigns.map((c, i) => (
-                                  <TableRow key={i}>
-                                    <TableCell className="font-medium max-w-[150px] truncate text-sm">{c.name}</TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className={cn('text-xs', getStatusColor(c.status))}>
-                                        {c.status === 'ENABLED' ? 'Ativo' : c.status === 'PAUSED' ? 'Pausado' : c.status}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right text-sm">{formatCurrency(c.spend)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(c.conversions)}</TableCell>
-                                    <TableCell className={cn('text-right text-sm font-semibold', getRoasColor(c.roas))}>{c.roas.toFixed(2)}x</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </ScrollArea>
-                        ) : (
-                          <p className="text-muted-foreground text-center py-8 text-sm">Nenhuma campanha encontrada</p>
-                        )}
-                      </CardContent>
-                    </Card>
+                  {/* Funnel */}
+                  <Card className="border-border/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-primary" />
+                        Funil de Performance
+                      </CardTitle>
+                      <CardDescription>Impressões → Cliques → Conversões</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <FunnelChart
+                        steps={[
+                          { label: 'Impressões', value: googleMetrics?.impressions || 0, formattedValue: formatNumber(googleMetrics?.impressions || 0), color: 'hsl(var(--primary))' },
+                          { label: 'Cliques', value: googleMetrics?.clicks || 0, formattedValue: formatNumber(googleMetrics?.clicks || 0), color: 'hsl(210, 70%, 50%)' },
+                          { label: 'Conversões', value: googleMetrics?.conversions || 0, formattedValue: formatNumber(googleMetrics?.conversions || 0), color: 'hsl(142, 60%, 45%)' },
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
 
-                    {/* Keywords Table */}
-                    <Card className="border-border/50">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Hash className="h-4 w-4 text-primary" />
-                          Top Palavras-chave
-                        </CardTitle>
-                        <CardDescription>Por gasto e conversões</CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        {googleLoading ? (
-                          <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                        ) : googleData?.keywords && googleData.keywords.length > 0 ? (
-                          <ScrollArea className="h-[320px]">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Palavra-chave</TableHead>
-                                  <TableHead className="text-right">Gasto</TableHead>
-                                  <TableHead className="text-right">Cliques</TableHead>
-                                  <TableHead className="text-right">Conv.</TableHead>
-                                  <TableHead className="text-center">QS</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {googleData.keywords.slice(0, 10).map((kw, i) => (
-                                  <TableRow key={i}>
-                                    <TableCell className="font-medium max-w-[140px] truncate text-sm">{kw.keyword}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatCurrency(kw.spend)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(kw.clicks)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(kw.conversions)}</TableCell>
-                                    <TableCell className="text-center">{getQualityScoreBadge(kw.qualityScore)}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </ScrollArea>
-                        ) : (
-                          <p className="text-muted-foreground text-center py-8 text-sm">Nenhuma palavra-chave encontrada</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                  {/* Campaigns Table */}
+                  <Card className="border-border/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Megaphone className="h-4 w-4 text-primary" />
+                        Campanhas
+                      </CardTitle>
+                      <CardDescription>Performance detalhada por campanha</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {googleLoading ? (
+                        <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                      ) : (
+                        <DataTable
+                          data={googleData?.campaigns || []}
+                          searchPlaceholder="Buscar campanha..."
+                          emptyMessage="Nenhuma campanha encontrada"
+                          columns={[
+                            { key: 'name', label: 'Campanha', minWidth: 200, searchable: true, searchValue: (c) => c.name, sortValue: (c) => c.name, render: (c) => <span className="font-medium" title={c.name}>{c.name}</span> },
+                            { key: 'status', label: 'Status', sortValue: (c) => c.status, render: (c) => <Badge variant="outline" className={cn('text-xs', getStatusColor(c.status))}>{c.status === 'ENABLED' ? 'Ativo' : c.status === 'PAUSED' ? 'Pausado' : c.status}</Badge> },
+                            { key: 'spend', label: 'Investimento', align: 'right', sortValue: (c) => c.spend, render: (c) => formatCurrency(c.spend) },
+                            { key: 'impressions', label: 'Impressões', align: 'right', sortValue: (c) => c.impressions || 0, render: (c) => formatNumber(c.impressions || 0) },
+                            { key: 'clicks', label: 'Cliques', align: 'right', sortValue: (c) => c.clicks || 0, render: (c) => formatNumber(c.clicks || 0) },
+                            { key: 'ctr', label: 'CTR', align: 'right', sortValue: (c) => c.ctr || 0, render: (c) => formatPercent(c.ctr || 0) },
+                            { key: 'conversions', label: 'Conv.', align: 'right', sortValue: (c) => c.conversions, render: (c) => formatNumber(c.conversions) },
+                            { key: 'roas', label: 'ROAS', align: 'right', sortValue: (c) => c.roas, render: (c) => <span className={cn('font-semibold', getRoasColor(c.roas))}>{c.roas.toFixed(2)}x</span> },
+                          ]}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
 
-                  {/* Search Terms + Opportunities */}
+                  {/* Keywords Table */}
+                  <Card className="border-border/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Hash className="h-4 w-4 text-primary" />
+                        Top Palavras-chave
+                      </CardTitle>
+                      <CardDescription>Por gasto e conversões</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {googleLoading ? (
+                        <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                      ) : (
+                        <DataTable
+                          data={googleData?.keywords || []}
+                          searchPlaceholder="Buscar palavra-chave..."
+                          emptyMessage="Nenhuma palavra-chave encontrada"
+                          maxHeight="360px"
+                          columns={[
+                            { key: 'keyword', label: 'Palavra-chave', minWidth: 180, searchable: true, searchValue: (kw) => kw.keyword, sortValue: (kw) => kw.keyword, render: (kw) => <span className="font-medium" title={kw.keyword}>{kw.keyword}</span> },
+                            { key: 'spend', label: 'Gasto', align: 'right', sortValue: (kw) => kw.spend, render: (kw) => formatCurrency(kw.spend) },
+                            { key: 'clicks', label: 'Cliques', align: 'right', sortValue: (kw) => kw.clicks, render: (kw) => formatNumber(kw.clicks) },
+                            { key: 'conversions', label: 'Conv.', align: 'right', sortValue: (kw) => kw.conversions, render: (kw) => formatNumber(kw.conversions) },
+                            { key: 'qs', label: 'QS', align: 'center', sortValue: (kw) => kw.qualityScore ?? -1, render: (kw) => getQualityScoreBadge(kw.qualityScore) },
+                          ]}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+
                   <div className="grid gap-6 lg:grid-cols-2">
                     {/* Search Terms */}
                     <Card className="border-border/50">
@@ -495,31 +485,19 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                       <CardContent className="p-0">
                         {googleLoading ? (
                           <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                        ) : googleData?.searchTerms?.converting && googleData.searchTerms.converting.length > 0 ? (
-                          <ScrollArea className="h-[260px]">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Termo</TableHead>
-                                  <TableHead className="text-right">Cliques</TableHead>
-                                  <TableHead className="text-right">Conv.</TableHead>
-                                  <TableHead className="text-right">Gasto</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {googleData.searchTerms.converting.slice(0, 8).map((st, i) => (
-                                  <TableRow key={i}>
-                                    <TableCell className="font-medium max-w-[160px] truncate text-sm">{st.searchTerm}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(st.clicks)}</TableCell>
-                                    <TableCell className="text-right text-sm font-semibold text-green-500">{formatNumber(st.conversions)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatCurrency(st.spend)}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </ScrollArea>
                         ) : (
-                          <p className="text-muted-foreground text-center py-8 text-sm">Nenhum termo encontrado</p>
+                          <DataTable
+                            data={googleData?.searchTerms?.converting || []}
+                            searchPlaceholder="Buscar termo..."
+                            emptyMessage="Nenhum termo encontrado"
+                            maxHeight="300px"
+                            columns={[
+                              { key: 'term', label: 'Termo', minWidth: 160, searchable: true, searchValue: (st) => st.searchTerm, sortValue: (st) => st.searchTerm, render: (st) => <span className="font-medium" title={st.searchTerm}>{st.searchTerm}</span> },
+                              { key: 'clicks', label: 'Cliques', align: 'right', sortValue: (st) => st.clicks, render: (st) => formatNumber(st.clicks) },
+                              { key: 'conv', label: 'Conv.', align: 'right', sortValue: (st) => st.conversions, render: (st) => <span className="font-semibold text-green-500">{formatNumber(st.conversions)}</span> },
+                              { key: 'spend', label: 'Gasto', align: 'right', sortValue: (st) => st.spend, render: (st) => formatCurrency(st.spend) },
+                            ]}
+                          />
                         )}
                       </CardContent>
                     </Card>
@@ -537,7 +515,7 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                         {googleLoading ? (
                           <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
                         ) : googleData?.opportunities && googleData.opportunities.length > 0 ? (
-                          <ScrollArea className="h-[260px]">
+                          <ScrollArea className="h-[300px]">
                             <div className="space-y-3 p-4">
                               {googleData.opportunities.map((opp, i) => (
                                 <div key={i} className={cn("rounded-lg border p-3", getSeverityColor(opp.severity))}>
@@ -627,6 +605,27 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                     <MetricCard icon={TrendingUp} label="ROAS" value={`${(metaMetrics?.roas || 0).toFixed(2)}x`} loading={metaLoading} iconColor="bg-indigo-500/10 text-indigo-500" valueColor={getRoasColor(metaMetrics?.roas || 0)} />
                   </div>
 
+                  {/* Funnel */}
+                  <Card className="border-border/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-primary" />
+                        Funil de Performance
+                      </CardTitle>
+                      <CardDescription>Impressões → Cliques → Conversões</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <FunnelChart
+                        steps={[
+                          { label: 'Impressões', value: metaMetrics?.impressions || 0, formattedValue: formatNumber(metaMetrics?.impressions || 0), color: 'hsl(var(--primary))' },
+                          { label: 'Alcance', value: metaMetrics?.reach || 0, formattedValue: formatNumber(metaMetrics?.reach || 0), color: 'hsl(210, 70%, 50%)' },
+                          { label: 'Cliques', value: metaMetrics?.clicks || 0, formattedValue: formatNumber(metaMetrics?.clicks || 0), color: 'hsl(38, 70%, 50%)' },
+                          { label: 'Conversões', value: metaMetrics?.conversions || 0, formattedValue: formatNumber(metaMetrics?.conversions || 0), color: 'hsl(142, 60%, 45%)' },
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
+
                   {/* Campaigns Table */}
                   <Card className="border-border/50">
                     <CardHeader className="pb-3">
@@ -639,49 +638,24 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
                     <CardContent className="p-0">
                       {metaLoading ? (
                         <div className="space-y-2 p-4">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                      ) : metaCampaigns.length === 0 ? (
-                        <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma campanha encontrada</p>
                       ) : (
-                        <ScrollArea className="max-h-[400px]">
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Campanha</TableHead>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead>Objetivo</TableHead>
-                                  <TableHead className="text-right">Investimento</TableHead>
-                                  <TableHead className="text-right">Impressões</TableHead>
-                                  <TableHead className="text-right">Cliques</TableHead>
-                                  <TableHead className="text-right">CTR</TableHead>
-                                  <TableHead className="text-right">CPC</TableHead>
-                                  <TableHead className="text-right">Conv.</TableHead>
-                                  <TableHead className="text-right">ROAS</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {metaCampaigns.map((campaign) => (
-                                  <TableRow key={campaign.id}>
-                                    <TableCell className="font-medium max-w-[180px] truncate text-sm">{campaign.name}</TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className={cn('text-xs', getStatusColor(campaign.status))}>
-                                        {campaign.status === 'ACTIVE' ? 'Ativo' : campaign.status === 'PAUSED' ? 'Pausado' : campaign.status}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">{campaign.objective}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatCurrency(campaign.spend)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(campaign.impressions)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(campaign.clicks)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatPercent(campaign.ctr)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatCurrency(campaign.cpc)}</TableCell>
-                                    <TableCell className="text-right text-sm">{formatNumber(campaign.conversions)}</TableCell>
-                                    <TableCell className={cn('text-right text-sm font-semibold', getRoasColor(campaign.roas))}>{campaign.roas.toFixed(2)}x</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </ScrollArea>
+                        <DataTable
+                          data={metaCampaigns}
+                          searchPlaceholder="Buscar campanha..."
+                          emptyMessage="Nenhuma campanha encontrada"
+                          columns={[
+                            { key: 'name', label: 'Campanha', minWidth: 220, searchable: true, searchValue: (c) => c.name, sortValue: (c) => c.name, render: (c) => <span className="font-medium" title={c.name}>{c.name}</span> },
+                            { key: 'status', label: 'Status', sortValue: (c) => c.status, render: (c) => <Badge variant="outline" className={cn('text-xs', getStatusColor(c.status))}>{c.status === 'ACTIVE' ? 'Ativo' : c.status === 'PAUSED' ? 'Pausado' : c.status}</Badge> },
+                            { key: 'objective', label: 'Objetivo', sortValue: (c) => c.objective, render: (c) => <span className="text-muted-foreground">{c.objective}</span> },
+                            { key: 'spend', label: 'Investimento', align: 'right', sortValue: (c) => c.spend, render: (c) => formatCurrency(c.spend) },
+                            { key: 'impressions', label: 'Impressões', align: 'right', sortValue: (c) => c.impressions, render: (c) => formatNumber(c.impressions) },
+                            { key: 'clicks', label: 'Cliques', align: 'right', sortValue: (c) => c.clicks, render: (c) => formatNumber(c.clicks) },
+                            { key: 'ctr', label: 'CTR', align: 'right', sortValue: (c) => c.ctr, render: (c) => formatPercent(c.ctr) },
+                            { key: 'cpc', label: 'CPC', align: 'right', sortValue: (c) => c.cpc, render: (c) => formatCurrency(c.cpc) },
+                            { key: 'conversions', label: 'Conv.', align: 'right', sortValue: (c) => c.conversions, render: (c) => formatNumber(c.conversions) },
+                            { key: 'roas', label: 'ROAS', align: 'right', sortValue: (c) => c.roas, render: (c) => <span className={cn('font-semibold', getRoasColor(c.roas))}>{c.roas.toFixed(2)}x</span> },
+                          ]}
+                        />
                       )}
                     </CardContent>
                   </Card>
