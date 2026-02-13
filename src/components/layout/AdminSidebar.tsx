@@ -75,7 +75,7 @@ const menuGroups = [
 ];
 
 export function AdminSidebar() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, role } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
@@ -155,7 +155,9 @@ export function AdminSidebar() {
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               {user?.email}
             </p>
-            <p className="text-xs text-muted-foreground">Administrador</p>
+            <p className="text-xs text-muted-foreground">
+              {role === 'gestor' ? 'Gestor' : 'Administrador'}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">

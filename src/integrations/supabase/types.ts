@@ -567,6 +567,35 @@ export type Database = {
           },
         ]
       }
+      gestor_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gestor_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_agendas: {
         Row: {
           client_id: string
@@ -1129,12 +1158,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_gestor_client_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_client_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_gestor_for_client: {
+        Args: { _client_id: string; _user_id: string }
         Returns: boolean
       }
     }
