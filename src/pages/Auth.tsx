@@ -27,7 +27,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (user && role) {
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'gestor') {
         navigate('/admin', { replace: true });
       } else if (role === 'client') {
         navigate('/portal', { replace: true });

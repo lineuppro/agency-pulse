@@ -23,7 +23,8 @@ serve(async (req) => {
       );
     }
 
-    const { clientId, email, fullName, password } = await req.json();
+    const { clientId, email, fullName, password, role } = await req.json();
+    const userRole = role || "client";
 
     if (!email) {
       return new Response(
@@ -92,11 +93,11 @@ serve(async (req) => {
         throw updateProfileError;
       }
 
-      // Add client role if not exists
+      // Add role if not exists
       const { error: roleError } = await supabase
         .from("user_roles")
         .upsert(
-          { user_id: existingUser.id, role: "client" },
+          { user_id: existingUser.id, role: userRole },
           { onConflict: "user_id,role" }
         );
 
@@ -162,10 +163,10 @@ serve(async (req) => {
       });
     }
 
-    // Add client role
+    // Add role
     const { error: roleError } = await supabase
       .from("user_roles")
-      .insert({ user_id: newUser.user.id, role: "client" });
+      .insert({ user_id: newUser.user.id, role: userRole });
 
     if (roleError) {
       console.error("[create-client-user] Error adding role:", roleError);
