@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -66,6 +67,7 @@ import {
   Pencil,
   Check,
   X,
+  Save,
 } from 'lucide-react';
 import { useTaskDetailsV2, TaskComment, ReactionType } from '@/hooks/useTaskDetailsV2';
 import { cn } from '@/lib/utils';
@@ -388,6 +390,15 @@ export function TaskDetailSidebar({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState<'comments' | 'attachments'>('comments');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    title: '',
+    description: '',
+    category: '' as TaskCategory,
+    status: '' as TaskStatus,
+    due_date: '',
+    assigned_to: '',
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -404,6 +415,41 @@ export function TaskDetailSidebar({
     getAttachmentUrl,
     currentUserId,
   } = useTaskDetailsV2(task?.id || null);
+
+  const startEditing = () => {
+    if (!task) return;
+    setEditData({
+      title: task.title,
+      description: task.description || '',
+      category: task.category,
+      status: task.status,
+      due_date: task.due_date || '',
+      assigned_to: task.assigned_to || '',
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+
+  const saveEditing = async () => {
+    if (!task || !onUpdate) return;
+    await onUpdate(task.id, {
+      title: editData.title,
+      description: editData.description || null,
+      category: editData.category,
+      status: editData.status,
+      due_date: editData.due_date || null,
+      assigned_to: editData.assigned_to || null,
+    });
+    setIsEditing(false);
+  };
+
+  const getAvailableUsers = () => {
+    if (!task) return users;
+    return users.filter((u) => u.client_id === task.client_id || !u.client_id);
+  };
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
@@ -452,49 +498,115 @@ export function TaskDetailSidebar({
   if (!task) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) { setIsEditing(false); } onClose(); }}>
       <SheetContent className="sm:max-w-lg w-full flex flex-col h-[100dvh] overflow-hidden p-0">
         {/* Header */}
         <SheetHeader className="shrink-0 p-6 pb-4 border-b">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <SheetTitle className="text-lg font-semibold text-foreground text-left">
-                {task.title}
-              </SheetTitle>
-              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                <Building2 className="h-3.5 w-3.5" />
-                {task.clients?.name}
-              </p>
+          {isEditing ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Título</Label>
+                <Input value={editData.title} onChange={(e) => setEditData({ ...editData, title: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Descrição</Label>
+                <Textarea value={editData.description} onChange={(e) => setEditData({ ...editData, description: e.target.value })} rows={3} className="resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Categoria</Label>
+                  <Select value={editData.category} onValueChange={(v) => setEditData({ ...editData, category: v as TaskCategory })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(categoryLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Status</Label>
+                  <Select value={editData.status} onValueChange={(v) => setEditData({ ...editData, status: v as TaskStatus })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(statusLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Data de Entrega</Label>
+                  <Input type="date" value={editData.due_date} onChange={(e) => setEditData({ ...editData, due_date: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Responsável</Label>
+                  <Select value={editData.assigned_to || 'none'} onValueChange={(v) => setEditData({ ...editData, assigned_to: v === 'none' ? '' : v })}>
+                    <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {getAvailableUsers().map((u) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>{u.full_name || u.email.split('@')[0]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={cancelEditing}><X className="h-3 w-3 mr-1" />Cancelar</Button>
+                <Button size="sm" onClick={saveEditing} disabled={!editData.title.trim()}><Save className="h-3 w-3 mr-1" />Salvar</Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <SheetTitle className="text-lg font-semibold text-foreground text-left">
+                    {task.title}
+                  </SheetTitle>
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {task.clients?.name}
+                  </p>
+                </div>
+                {onUpdate && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={startEditing}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            <Badge className={categoryColors[task.category]}>
-              <Tag className="h-3 w-3 mr-1" />
-              {categoryLabels[task.category]}
-            </Badge>
-            <Badge className={statusColors[task.status]}>
-              {statusLabels[task.status]}
-            </Badge>
-            {task.due_date && (
-              <Badge variant="outline" className="text-xs">
-                <Calendar className="h-3 w-3 mr-1" />
-                {format(new Date(task.due_date), "dd 'de' MMM", { locale: ptBR })}
-              </Badge>
-            )}
-          </div>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <Badge className={categoryColors[task.category]}>
+                  <Tag className="h-3 w-3 mr-1" />
+                  {categoryLabels[task.category]}
+                </Badge>
+                <Badge className={statusColors[task.status]}>
+                  {statusLabels[task.status]}
+                </Badge>
+                {task.due_date && (
+                  <Badge variant="outline" className="text-xs">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {format(new Date(task.due_date), "dd 'de' MMM", { locale: ptBR })}
+                  </Badge>
+                )}
+              </div>
 
-          {task.assigned_to && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
-              <User className="h-3.5 w-3.5" />
-              <span>Responsável: {getUserName(task.assigned_to)}</span>
-            </div>
-          )}
+              {task.assigned_to && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
+                  <User className="h-3.5 w-3.5" />
+                  <span>Responsável: {getUserName(task.assigned_to)}</span>
+                </div>
+              )}
 
-          {task.description && (
-            <p className="text-sm text-muted-foreground mt-3 text-left">
-              {task.description}
-            </p>
+              {task.description && (
+                <p className="text-sm text-muted-foreground mt-3 text-left">
+                  {task.description}
+                </p>
+              )}
+            </>
           )}
         </SheetHeader>
 
