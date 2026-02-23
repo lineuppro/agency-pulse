@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useClientContext } from '@/contexts/ClientContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -116,7 +117,7 @@ function MetricCard({
 }
 
 export default function TrafficAds() {
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const { selectedClientId: globalClientId, clients: globalClients } = useClientContext();
   const [dateRange, setDateRange] = useState<MetaDateRange>('last_30d');
   const [activeTab, setActiveTab] = useState<'google' | 'meta'>('google');
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
@@ -132,25 +133,12 @@ export default function TrafficAds() {
   const { session } = useAuth();
   const { toast } = useToast();
 
+  const selectedClientId = globalClientId !== 'all' ? globalClientId : '';
+  const clients = globalClients as Client[];
+
   const { metrics: metaMetrics, campaigns: metaCampaigns, loading: metaLoading, error: metaError, fetchMetrics: fetchMetaMetrics } = useMetaAdsMetrics();
   const { data: metaConnection, isLoading: isLoadingMetaConnection } = useMetaAdsConnection(selectedClientId);
   const { data: googleData, loading: googleLoading, error: googleError, fetchDetailedData: fetchGoogleData } = useGoogleAdsDetailed();
-
-  const { data: clients = [], isLoading: loadingClients } = useQuery({
-    queryKey: ['clients-for-traffic-ads'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('id, name, google_ads_id').order('name');
-      if (error) throw error;
-      return data as Client[];
-    },
-  });
-
-  useEffect(() => {
-    if (clients.length > 0 && !selectedClientId) {
-      const clientWithAds = clients.find(c => c.google_ads_id);
-      setSelectedClientId(clientWithAds?.id || clients[0].id);
-    }
-  }, [clients, selectedClientId]);
 
   useEffect(() => {
     if (!selectedClientId) return;
@@ -285,17 +273,6 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={loadingClients}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Selecione o cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Select value={dateRange} onValueChange={(v) => setDateRange(v as MetaDateRange)}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Período" />
@@ -306,6 +283,8 @@ Forneça análises detalhadas, insights acionáveis e recomendações de otimiza
               ))}
             </SelectContent>
           </Select>
+
+
 
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
