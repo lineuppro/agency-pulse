@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useClientContext } from '@/contexts/ClientContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -63,40 +64,17 @@ const getSeverityColor = (severity: string) => {
 };
 
 export default function AdminPerformance() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const { selectedClientId: globalClientId, clients: globalClients } = useClientContext();
+  const selectedClientId = globalClientId !== 'all' ? globalClientId : '';
   const [dateRange, setDateRange] = useState<DateRange>('LAST_30_DAYS');
-  const [loadingClients, setLoadingClients] = useState(true);
   const { data, loading, error, fetchDetailedData } = useGoogleAdsDetailed();
   const { toast } = useToast();
 
   useEffect(() => {
-    async function loadClients() {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name, google_ads_id')
-        .order('name');
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Falha ao carregar clientes',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setClients(data || []);
-      setLoadingClients(false);
-      
-      const clientWithAds = data?.find(c => c.google_ads_id);
-      if (clientWithAds) {
-        setSelectedClientId(clientWithAds.id);
-      }
+    if (selectedClientId) {
+      fetchDetailedData(selectedClientId, dateRange);
     }
-
-    loadClients();
-  }, []);
+  }, [selectedClientId, dateRange]);
 
   useEffect(() => {
     if (selectedClientId) {
@@ -110,7 +88,7 @@ export default function AdminPerformance() {
     }
   };
 
-  const selectedClient = clients.find(c => c.id === selectedClientId);
+  const selectedClient = globalClients.find(c => c.id === selectedClientId) as Client | undefined;
   const metrics = data?.metrics;
 
   const metricsCards = [
@@ -176,23 +154,6 @@ export default function AdminPerformance() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
-          <Select 
-            value={selectedClientId} 
-            onValueChange={setSelectedClientId}
-            disabled={loadingClients}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Selecione um cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name} {!client.google_ads_id && '(sem Ads)'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Período" />

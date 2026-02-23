@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -35,6 +36,13 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Send,
   Upload,
   Trash2,
@@ -55,6 +63,9 @@ import {
   ChevronRight,
   Smile,
   Paperclip,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import { useTaskDetailsV2, TaskComment, ReactionType } from '@/hooks/useTaskDetailsV2';
 import { cn } from '@/lib/utils';
@@ -78,13 +89,28 @@ interface Task {
   meeting_agendas?: { title: string; meeting_date: string } | null;
 }
 
+interface UserProfile {
+  user_id: string;
+  full_name: string | null;
+  email: string;
+  client_id: string | null;
+}
+
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 interface TaskDetailSidebarProps {
   task: Task | null;
   open: boolean;
   onClose: () => void;
   onDelete?: (taskId: string) => Promise<void>;
+  onUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>;
   isAdmin: boolean;
   getUserName: (userId: string | null) => string | null;
+  users?: UserProfile[];
+  clients?: ClientOption[];
 }
 
 const categoryLabels: Record<TaskCategory, string> = {
@@ -167,16 +193,20 @@ function CommentItem({
   comment,
   onReply,
   onToggleReaction,
+  onEditComment,
   currentUserId,
   isReply = false,
 }: {
   comment: TaskComment;
   onReply: (commentId: string) => void;
   onToggleReaction: (commentId: string, type: ReactionType) => void;
+  onEditComment: (commentId: string, content: string) => void;
   currentUserId?: string;
   isReply?: boolean;
 }) {
   const [showReplies, setShowReplies] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(comment.content);
   
   const reactionCounts = comment.reactions.reduce((acc, r) => {
     acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1;
@@ -193,6 +223,15 @@ function CommentItem({
     addSuffix: false,
     locale: ptBR,
   });
+
+  const isOwner = currentUserId === comment.user_id;
+
+  const handleSaveEdit = () => {
+    if (editContent.trim() && editContent !== comment.content) {
+      onEditComment(comment.id, editContent);
+    }
+    setIsEditing(false);
+  };
 
   return (
     <div className={cn("group", isReply && "ml-8 border-l-2 border-muted pl-4")}>
@@ -211,11 +250,37 @@ function CommentItem({
             <span className="text-xs text-muted-foreground">{timeAgo}</span>
           </div>
 
-          <div className="bg-muted/50 rounded-lg p-3 mb-2">
-            <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-              {comment.content}
-            </p>
-          </div>
+          {isEditing ? (
+            <div className="bg-muted/50 rounded-lg p-3 mb-2 space-y-2">
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="resize-none min-h-[60px] text-sm"
+              />
+              <div className="flex gap-1 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => { setIsEditing(false); setEditContent(comment.content); }}>
+                  <X className="h-3 w-3 mr-1" /> Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSaveEdit} disabled={!editContent.trim()}>
+                  <Check className="h-3 w-3 mr-1" /> Salvar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-muted/50 rounded-lg p-3 mb-2 group/comment relative">
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                {comment.content}
+              </p>
+              {isOwner && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="absolute top-2 right-2 opacity-0 group-hover/comment:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
+                >
+                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Reactions and actions */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -294,6 +359,7 @@ function CommentItem({
                     comment={reply}
                     onReply={onReply}
                     onToggleReaction={onToggleReaction}
+                    onEditComment={onEditComment}
                     currentUserId={currentUserId}
                     isReply
                   />
@@ -312,8 +378,11 @@ export function TaskDetailSidebar({
   open,
   onClose,
   onDelete,
+  onUpdate,
   isAdmin,
   getUserName,
+  users = [],
+  clients = [],
 }: TaskDetailSidebarProps) {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -328,6 +397,7 @@ export function TaskDetailSidebar({
     activityLog,
     loading,
     addComment,
+    updateComment,
     toggleReaction,
     uploadAttachment,
     deleteAttachment,
@@ -529,6 +599,7 @@ export function TaskDetailSidebar({
                         comment={comment}
                         onReply={handleReply}
                         onToggleReaction={toggleReaction}
+                        onEditComment={updateComment}
                         currentUserId={currentUserId}
                       />
                     ))

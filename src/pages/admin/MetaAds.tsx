@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useClientContext } from '@/contexts/ClientContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -37,32 +38,13 @@ const dateRangeOptions: { value: MetaDateRange; label: string }[] = [
 ];
 
 export default function MetaAds() {
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const { selectedClientId: globalClientId } = useClientContext();
+  const selectedClientId = globalClientId !== 'all' ? globalClientId : '';
   const [dateRange, setDateRange] = useState<MetaDateRange>('last_30d');
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
 
   const { metrics, campaigns, loading, error, fetchMetrics } = useMetaAdsMetrics();
   const { data: connection, isLoading: isLoadingConnection } = useMetaAdsConnection(selectedClientId);
-
-  // Fetch clients
-  const { data: clients = [] } = useQuery({
-    queryKey: ['clients-for-meta-ads'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name')
-        .order('name');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Set first client as default
-  useEffect(() => {
-    if (clients.length > 0 && !selectedClientId) {
-      setSelectedClientId(clients[0].id);
-    }
-  }, [clients, selectedClientId]);
 
   // Fetch metrics when client or date range changes
   useEffect(() => {
@@ -124,21 +106,8 @@ export default function MetaAds() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Selecione o cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Select value={dateRange} onValueChange={(v) => setDateRange(v as MetaDateRange)}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
@@ -149,6 +118,15 @@ export default function MetaAds() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={loading || !connection}
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </Button>
 
           <Button
             variant="outline"

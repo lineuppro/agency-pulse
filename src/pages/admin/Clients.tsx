@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Building2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Building2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ interface Client {
   logo_url: string | null;
   google_ads_id: string | null;
   google_drive_id: string | null;
+  website_url: string | null;
   created_at: string;
   user_email?: string | null;
 }
@@ -30,6 +31,7 @@ export default function AdminClients() {
     logo_url: '',
     google_ads_id: '',
     google_drive_id: '',
+    website_url: '',
   });
   const { toast } = useToast();
 
@@ -83,6 +85,7 @@ export default function AdminClients() {
             logo_url: formData.logo_url || null,
             google_ads_id: formData.google_ads_id || null,
             google_drive_id: formData.google_drive_id || null,
+            website_url: formData.website_url || null,
           })
           .eq('id', editingClient.id);
 
@@ -96,6 +99,7 @@ export default function AdminClients() {
             logo_url: formData.logo_url || null,
             google_ads_id: formData.google_ads_id || null,
             google_drive_id: formData.google_drive_id || null,
+            website_url: formData.website_url || null,
           })
           .select()
           .single();
@@ -107,7 +111,7 @@ export default function AdminClients() {
 
       setIsDialogOpen(false);
       setEditingClient(null);
-      setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '' });
+      setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '', website_url: '' });
       fetchClients();
     } catch (error) {
       console.error('Error saving client:', error);
@@ -126,6 +130,7 @@ export default function AdminClients() {
       logo_url: client.logo_url || '',
       google_ads_id: client.google_ads_id || '',
       google_drive_id: client.google_drive_id || '',
+      website_url: client.website_url || '',
     });
     setIsDialogOpen(true);
   };
@@ -148,7 +153,7 @@ export default function AdminClients() {
 
   const handleOpenDialog = () => {
     setEditingClient(null);
-    setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '' });
+    setFormData({ name: '', logo_url: '', google_ads_id: '', google_drive_id: '', website_url: '' });
     setIsDialogOpen(true);
   };
 
@@ -206,6 +211,15 @@ export default function AdminClients() {
                   value={formData.google_ads_id}
                   onChange={(e) => setFormData({ ...formData, google_ads_id: e.target.value })}
                   placeholder="Ex: 123-456-7890"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website_url">Website / Link</Label>
+                <Input
+                  id="website_url"
+                  value={formData.website_url}
+                  onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                  placeholder="https://www.exemplo.com.br"
                 />
               </div>
               <div className="space-y-2">
@@ -308,12 +322,14 @@ export default function AdminClients() {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                  {client.website_url && (
+                    <Button variant="outline" size="sm" onClick={() => window.open(client.website_url!, '_blank')}>
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(client)}>
                     <Pencil className="mr-1 h-3 w-3" />
                     Editar
-                  </Button>
-                  <Button variant="outline" size="sm" disabled>
-                    <RefreshCw className="h-3 w-3" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

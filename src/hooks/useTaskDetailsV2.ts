@@ -310,12 +310,32 @@ export function useTaskDetailsV2(taskId: string | null) {
     return data?.signedUrl;
   };
 
+  const updateComment = async (commentId: string, content: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('task_comments')
+        .update({ content })
+        .eq('id', commentId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      toast({ title: 'Comentário atualizado!' });
+      fetchTaskDetails();
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      toast({ title: 'Erro ao atualizar comentário', variant: 'destructive' });
+    }
+  };
+
   return {
     comments,
     attachments,
     activityLog,
     loading,
     addComment,
+    updateComment,
     toggleReaction,
     uploadAttachment,
     deleteAttachment,

@@ -93,7 +93,7 @@ export default function AdminFiles() {
                   </div>
                 </CardContent>
               </Card>
-            ))
+            ))}
           </div>
         </>
       )}
