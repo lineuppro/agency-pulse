@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, CalendarDays, FolderPlus, Filter, Sparkles, List, LayoutGrid } from 'lucide-react';
+import { Plus, CalendarDays, FolderPlus, Filter, Sparkles, List, LayoutGrid, Send } from 'lucide-react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +11,7 @@ import { ContentListView } from '@/components/calendar/ContentListView';
 import { ContentModal } from '@/components/calendar/ContentModal';
 import { ContentSidebar } from '@/components/calendar/ContentSidebar';
 import { CampaignModal } from '@/components/calendar/CampaignModal';
+import { SchedulePostModal } from '@/components/social/SchedulePostModal';
 import { 
   useEditorialCalendar, 
   type EditorialContent,
@@ -28,6 +29,7 @@ export default function AdminCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isSchedulePostOpen, setIsSchedulePostOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<EditorialContent | null>(null);
   const [viewingContent, setViewingContent] = useState<EditorialContent | null>(null);
@@ -102,6 +104,9 @@ export default function AdminCalendar() {
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => setIsCampaignModalOpen(true)}><FolderPlus className="h-4 w-4 mr-2" />Criar Campanha</Button>
           <Button variant="outline" onClick={() => navigate('/admin/content-creation')} className="gap-2"><Sparkles className="h-4 w-4" />Gerar com IA</Button>
+          {selectedClientId !== 'all' && (
+            <Button variant="outline" onClick={() => setIsSchedulePostOpen(true)} className="gap-2"><Send className="h-4 w-4" />Agendar Post</Button>
+          )}
           <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'calendar' | 'list')}>
             <TabsList className="h-9">
               <TabsTrigger value="calendar" className="px-3"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
@@ -123,6 +128,9 @@ export default function AdminCalendar() {
       <ContentModal open={isModalOpen} onOpenChange={(open) => { setIsModalOpen(open); if (!open) setEditingContent(null); }} content={editingContent} clientId={selectedClientId !== 'all' ? selectedClientId : undefined} clients={clients} onSave={handleSaveContent} isLoading={createContent.isPending || updateContent.isPending} />
       <ContentSidebar open={isSidebarOpen} onOpenChange={(open) => { setIsSidebarOpen(open); if (!open) setViewingContent(null); }} content={viewingContent} isAdmin={true} campaignName={viewingContent ? getCampaignName(viewingContent.campaign_id) : undefined} onSave={handleSidebarSave} onDelete={handleDeleteContent} onStatusChange={handleStatusChange} isLoading={updateContent.isPending} />
       <CampaignModal open={isCampaignModalOpen} onOpenChange={setIsCampaignModalOpen} clients={clients} selectedClientId={selectedClientId !== 'all' ? selectedClientId : undefined} onSave={handleCreateCampaign} isLoading={createCampaign.isPending} />
+      {selectedClientId !== 'all' && (
+        <SchedulePostModal open={isSchedulePostOpen} onOpenChange={setIsSchedulePostOpen} clientId={selectedClientId} />
+      )}
     </div>
   );
 }
