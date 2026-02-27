@@ -294,8 +294,45 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { access_token, ad_account_id, ad_account_name } = metaAds;
+    const { access_token, ad_account_id, ad_account_name, token_expires_at } = metaAds as any;
     
+    // Auto-refresh token if expiring within 7 days
+    let activeToken = access_token;
+    if (token_expires_at) {
+      const expiresAt = new Date(token_expires_at);
+      const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      if (expiresAt < sevenDaysFromNow) {
+        console.log('Token expiring soon, attempting auto-refresh...');
+        const META_APP_ID = Deno.env.get('META_APP_ID');
+        const META_APP_SECRET = Deno.env.get('META_APP_SECRET');
+        if (META_APP_ID && META_APP_SECRET) {
+          try {
+            const refreshUrl = new URL('https://graph.facebook.com/v22.0/oauth/access_token');
+            refreshUrl.searchParams.set('grant_type', 'fb_exchange_token');
+            refreshUrl.searchParams.set('client_id', META_APP_ID);
+            refreshUrl.searchParams.set('client_secret', META_APP_SECRET);
+            refreshUrl.searchParams.set('fb_exchange_token', access_token);
+            const refreshResp = await fetch(refreshUrl.toString());
+            const refreshData = await refreshResp.json();
+            if (refreshResp.ok && refreshData.access_token) {
+              activeToken = refreshData.access_token;
+              const newExpiry = refreshData.expires_in
+                ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+                : null;
+              await supabase.from('client_meta_ads').update({
+                access_token: activeToken,
+                token_expires_at: newExpiry,
+                updated_at: new Date().toISOString(),
+              }).eq('client_id', clientId);
+              console.log('Token refreshed successfully.');
+            }
+          } catch (refreshErr) {
+            console.error('Auto-refresh failed, using existing token:', refreshErr);
+          }
+        }
+      }
+    }
+
     // Ensure ad_account_id has the 'act_' prefix
     const formattedAccountId = ad_account_id.startsWith('act_') ? ad_account_id : `act_${ad_account_id}`;
     
@@ -305,11 +342,11 @@ Deno.serve(async (req) => {
     console.log('Date range:', dateRangeParams);
 
     // Fetch account-level insights
-    const accountInsights = await fetchAccountInsights(formattedAccountId, access_token, dateRangeParams);
+    const accountInsights = await fetchAccountInsights(formattedAccountId, activeToken, dateRangeParams);
     const metrics = parseInsights(accountInsights.data?.[0]);
 
     // Fetch campaign-level data
-    const campaignsResponse = await fetchCampaigns(formattedAccountId, access_token, dateRangeParams);
+    const campaignsResponse = await fetchCampaigns(formattedAccountId, activeToken, dateRangeParams);
     
     const campaigns = campaignsResponse.data.map(campaign => {
       const campaignInsights = campaign.insights?.data?.[0];

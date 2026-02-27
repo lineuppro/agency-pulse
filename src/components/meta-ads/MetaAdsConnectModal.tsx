@@ -20,8 +20,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ExternalLink, Trash2, Facebook } from 'lucide-react';
-import { useMetaAdsConnectionManager, type MetaAdsConnection } from '@/hooks/useMetaAdsMetrics';
+import { ExternalLink, Trash2, Facebook, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { useMetaAdsConnectionManager, useMetaTokenRefresh, type MetaAdsConnection } from '@/hooks/useMetaAdsMetrics';
+import { Badge } from '@/components/ui/badge';
 
 interface MetaAdsConnectModalProps {
   open: boolean;
@@ -42,6 +43,27 @@ export function MetaAdsConnectModal({
   const [showDisconnectAlert, setShowDisconnectAlert] = useState(false);
 
   const { connectAccount, disconnectAccount } = useMetaAdsConnectionManager();
+  const { refreshExpiring } = useMetaTokenRefresh();
+
+  const getTokenStatus = () => {
+    if (!existingConnection?.token_expires_at) return 'unknown';
+    const expiresAt = new Date(existingConnection.token_expires_at);
+    const now = new Date();
+    const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft <= 0) return 'expired';
+    if (daysLeft <= 7) return 'expiring';
+    return 'valid';
+  };
+
+  const getTokenDaysLeft = () => {
+    if (!existingConnection?.token_expires_at) return null;
+    const expiresAt = new Date(existingConnection.token_expires_at);
+    const now = new Date();
+    return Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const tokenStatus = existingConnection ? getTokenStatus() : null;
+  const daysLeft = getTokenDaysLeft();
 
   const handleConnect = () => {
     if (!accessToken.trim() || !adAccountId.trim()) return;
@@ -92,14 +114,51 @@ export function MetaAdsConnectModal({
           </DialogHeader>
 
           {existingConnection && (
-            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-              <p className="text-sm font-medium">Conta conectada:</p>
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Conta conectada:</p>
+                {tokenStatus === 'valid' && (
+                  <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Token válido ({daysLeft}d)
+                  </Badge>
+                )}
+                {tokenStatus === 'expiring' && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Expira em {daysLeft}d
+                  </Badge>
+                )}
+                {tokenStatus === 'expired' && (
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Token expirado
+                  </Badge>
+                )}
+                {tokenStatus === 'unknown' && (
+                  <Badge variant="outline" className="text-muted-foreground">
+                    Validade desconhecida
+                  </Badge>
+                )}
+              </div>
               <p className="text-foreground">
                 {existingConnection.ad_account_name || existingConnection.ad_account_id}
               </p>
               <p className="text-xs text-muted-foreground">
                 ID: {existingConnection.ad_account_id}
               </p>
+              {(tokenStatus === 'expiring' || tokenStatus === 'expired') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refreshExpiring.mutate()}
+                  disabled={refreshExpiring.isPending}
+                  className="w-full"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-2 ${refreshExpiring.isPending ? 'animate-spin' : ''}`} />
+                  {refreshExpiring.isPending ? 'Renovando...' : 'Renovar Token Automaticamente'}
+                </Button>
+              )}
             </div>
           )}
 

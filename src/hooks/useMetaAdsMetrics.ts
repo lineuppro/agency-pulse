@@ -130,11 +130,94 @@ export function useMetaAdsMetrics() {
 }
 
 // Hook for managing Meta Ads connections
-export function useMetaAdsConnectionManager() {
+// Hook for exchanging/refreshing Meta tokens
+export function useMetaTokenRefresh() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Connect a Meta Ads account
+  const exchangeToken = async (accessToken: string, clientId?: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Sessão expirada');
+
+      const { data, error } = await supabase.functions.invoke('meta-token-refresh', {
+        body: { action: 'exchange', accessToken, clientId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.exchanged) {
+        queryClient.invalidateQueries({ queryKey: ['meta-ads-connection'] });
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Token exchange error:', err);
+      return null;
+    }
+  };
+
+  const refreshExpiring = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Sessão expirada');
+
+      const { data, error } = await supabase.functions.invoke('meta-token-refresh', {
+        body: { action: 'refresh' },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.refreshed > 0) {
+        toast({
+          title: 'Tokens renovados',
+          description: `${data.refreshed} de ${data.total} tokens foram renovados com sucesso.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['meta-ads-connection'] });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao renovar tokens',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const checkToken = async (clientId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Sessão expirada');
+
+      const { data, error } = await supabase.functions.invoke('meta-token-refresh', {
+        body: { action: 'check', clientId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Token check error:', err);
+      return null;
+    }
+  };
+
+  return { exchangeToken, refreshExpiring, checkToken };
+}
+
+// Hook for managing Meta Ads connections
+export function useMetaAdsConnectionManager() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { exchangeToken } = useMetaTokenRefresh();
+
+  // Connect a Meta Ads account (with auto token exchange)
   const connectAccount = useMutation({
     mutationFn: async ({
       clientId,
@@ -147,6 +230,11 @@ export function useMetaAdsConnectionManager() {
       adAccountId: string;
       adAccountName?: string;
     }) => {
+      // First, try to exchange for a long-lived token
+      const exchangeResult = await exchangeToken(accessToken);
+      const finalToken = exchangeResult?.longLivedToken || accessToken;
+      const tokenExpiresAt = exchangeResult?.expiresAt || null;
+
       // Check if connection already exists
       const { data: existing } = await supabase
         .from('client_meta_ads')
@@ -155,13 +243,13 @@ export function useMetaAdsConnectionManager() {
         .maybeSingle();
 
       if (existing) {
-        // Update existing connection
         const { data, error } = await supabase
           .from('client_meta_ads')
           .update({
-            access_token: accessToken,
+            access_token: finalToken,
             ad_account_id: adAccountId,
             ad_account_name: adAccountName || null,
+            token_expires_at: tokenExpiresAt,
             updated_at: new Date().toISOString(),
           })
           .eq('client_id', clientId)
@@ -169,28 +257,31 @@ export function useMetaAdsConnectionManager() {
           .single();
 
         if (error) throw error;
-        return data;
+        return { ...data, exchanged: exchangeResult?.exchanged };
       } else {
-        // Create new connection
         const { data, error } = await supabase
           .from('client_meta_ads')
           .insert({
             client_id: clientId,
-            access_token: accessToken,
+            access_token: finalToken,
             ad_account_id: adAccountId,
             ad_account_name: adAccountName || null,
+            token_expires_at: tokenExpiresAt,
           })
           .select()
           .single();
 
         if (error) throw error;
-        return data;
+        return { ...data, exchanged: exchangeResult?.exchanged };
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const exchangeMsg = data?.exchanged
+        ? ' Token convertido para longa duração (~60 dias).'
+        : '';
       toast({
         title: 'Conta conectada',
-        description: 'A conta Meta Ads foi conectada com sucesso.',
+        description: `A conta Meta Ads foi conectada com sucesso.${exchangeMsg}`,
       });
       queryClient.invalidateQueries({ queryKey: ['meta-ads-connection'] });
     },

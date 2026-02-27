@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.meta-ads-metrics]
 verify_jwt = false
+
+[functions.meta-token-refresh]
+verify_jwt = false
