@@ -13,6 +13,7 @@ import {
   type ContentStatus 
 } from '@/hooks/useEditorialCalendar';
 import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
+import { useCalendarScheduledPosts } from '@/hooks/useCalendarScheduledPosts';
 
 export default function PortalCalendar() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function PortalCalendar() {
   }, [currentDate, view]);
 
   const { 
-    contents, 
+    contents: editorialContents, 
     isLoading, 
     updateStatus 
   } = useEditorialCalendar(
@@ -49,6 +50,16 @@ export default function PortalCalendar() {
     dateRange.start,
     dateRange.end
   );
+
+  const { data: scheduledPostItems = [] } = useCalendarScheduledPosts(
+    clientId || undefined,
+    dateRange.start,
+    dateRange.end
+  );
+
+  const contents = useMemo(() => {
+    return [...editorialContents, ...scheduledPostItems];
+  }, [editorialContents, scheduledPostItems]);
 
   // Fetch campaigns to show campaign name in sidebar
   const { campaigns } = useEditorialCampaigns(clientId || undefined);
@@ -61,6 +72,7 @@ export default function PortalCalendar() {
   };
 
   const handleContentClick = (content: EditorialContent) => {
+    if (content.id.startsWith('sp_')) return;
     navigate(`/portal/calendar/${content.id}`);
   };
 

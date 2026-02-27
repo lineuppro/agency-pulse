@@ -13,7 +13,7 @@ import type { ContentType, ContentStatus, EditorialContent } from '@/hooks/useEd
 import { getContentTypeLabel, getContentStatusLabel } from '@/hooks/useEditorialCalendar';
 
 interface ContentCardProps {
-  content: EditorialContent;
+  content: EditorialContent & { _isScheduledPost?: boolean; _scheduledPostStatus?: string };
   compact?: boolean;
   isAdmin?: boolean;
   onEdit?: (content: EditorialContent) => void;
@@ -95,6 +95,7 @@ export function ContentCard({
   const typeConfig = contentTypeConfig[content.content_type];
   const TypeIcon = typeConfig.icon;
   const StatusIcon = statusConfig[content.status].icon;
+  const isScheduledPost = !!(content as any)._isScheduledPost;
 
   if (compact) {
     return (
@@ -103,9 +104,11 @@ export function ContentCard({
         className={cn(
           'w-full text-left p-1.5 rounded-md text-xs flex items-center gap-1.5 transition-colors',
           typeConfig.bgColor,
+          isScheduledPost && 'border border-dashed border-primary/40',
           'hover:opacity-80 cursor-pointer'
         )}
       >
+        {isScheduledPost && <Send className="h-3 w-3 flex-shrink-0 text-primary" />}
         <TypeIcon className={cn('h-3 w-3 flex-shrink-0', typeConfig.color)} />
         <span className="truncate font-medium">{content.title}</span>
       </button>
