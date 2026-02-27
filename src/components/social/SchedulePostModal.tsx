@@ -164,14 +164,21 @@ export function SchedulePostModal({
       // Upload media files
       const mediaUrls = await uploadMediaFiles();
 
-      // Create scheduled time
+      // Create scheduled time in Brazil timezone (UTC-3)
       const [hours, minutes] = scheduledTime.split(':').map(Number);
-      const scheduledAt = publishNow
-        ? new Date()
-        : new Date(scheduledDate!);
-      
-      if (!publishNow) {
-        scheduledAt.setHours(hours, minutes, 0, 0);
+      let scheduledAt: Date;
+
+      if (publishNow) {
+        scheduledAt = new Date();
+      } else {
+        // Build the date string in Brazil timezone and convert to UTC
+        const year = scheduledDate!.getFullYear();
+        const month = String(scheduledDate!.getMonth() + 1).padStart(2, '0');
+        const day = String(scheduledDate!.getDate()).padStart(2, '0');
+        const h = String(hours).padStart(2, '0');
+        const m = String(minutes).padStart(2, '0');
+        // Brazil is UTC-3, so add 3 hours to get UTC
+        scheduledAt = new Date(`${year}-${month}-${day}T${h}:${m}:00-03:00`);
       }
 
       // Parse hashtags
