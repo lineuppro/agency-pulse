@@ -181,7 +181,7 @@ export function SchedulePostModal({
         .map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
 
       // Create post for each selected platform
-      for (const platform of selectedPlatforms) {
+      const promises = selectedPlatforms.map((platform) => {
         const input: CreateScheduledPostInput = {
           client_id: clientId,
           editorial_content_id: editorialContentId,
@@ -192,9 +192,10 @@ export function SchedulePostModal({
           hashtags: hashtagsArray.length > 0 ? hashtagsArray : undefined,
           scheduled_at: scheduledAt.toISOString(),
         };
+        return createScheduledPost.mutateAsync(input);
+      });
 
-        await createScheduledPost.mutateAsync(input);
-      }
+      await Promise.all(promises);
 
       // Reset form and close modal
       setSelectedPlatforms([]);

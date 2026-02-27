@@ -103,6 +103,7 @@ export function useScheduledPosts(editorialContentId?: string | null, clientId?:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-scheduled-posts'] });
       toast.success('Post agendado com sucesso!');
     },
     onError: (error) => {
