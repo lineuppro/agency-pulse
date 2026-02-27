@@ -56,7 +56,7 @@ const platformConfig: Record<SocialPlatform, { icon: typeof Instagram; color: st
 };
 
 export function ScheduledPostsList({ editorialContentId, clientId }: ScheduledPostsListProps) {
-  const { scheduledPosts, isLoading, deleteScheduledPost, publishNow } = useScheduledPosts(
+  const { scheduledPosts, isLoading, deleteScheduledPost, hardDeleteScheduledPost, publishNow } = useScheduledPosts(
     editorialContentId,
     clientId
   );
@@ -168,24 +168,30 @@ export function ScheduledPostsList({ editorialContentId, clientId }: ScheduledPo
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" title="Cancelar agendamento">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
+                          <AlertDialogTitle>O que deseja fazer?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. O post não será publicado.
+                            Escolha entre cancelar o agendamento (mantém o registro) ou excluir permanentemente.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
+                        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
                           <AlertDialogCancel>Voltar</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => deleteScheduledPost.mutate(post.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="bg-amber-600 text-white hover:bg-amber-700"
                           >
                             Cancelar Agendamento
+                          </AlertDialogAction>
+                          <AlertDialogAction
+                            onClick={() => hardDeleteScheduledPost.mutate(post.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Excluir Permanentemente
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

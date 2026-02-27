@@ -136,7 +136,7 @@ export function useScheduledPosts(editorialContentId?: string | null, clientId?:
     },
   });
 
-  // Delete/cancel a scheduled post
+  // Cancel a scheduled post (soft delete)
   const deleteScheduledPost = useMutation({
     mutationFn: async (postId: string) => {
       const { error } = await supabase
@@ -148,11 +148,33 @@ export function useScheduledPosts(editorialContentId?: string | null, clientId?:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-scheduled-posts'] });
       toast.success('Agendamento cancelado!');
     },
     onError: (error) => {
       console.error('Error cancelling scheduled post:', error);
       toast.error('Erro ao cancelar agendamento');
+    },
+  });
+
+  // Hard delete a scheduled post
+  const hardDeleteScheduledPost = useMutation({
+    mutationFn: async (postId: string) => {
+      const { error } = await supabase
+        .from('social_scheduled_posts')
+        .delete()
+        .eq('id', postId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-scheduled-posts'] });
+      toast.success('Post excluído com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Error deleting scheduled post:', error);
+      toast.error('Erro ao excluir post');
     },
   });
 
@@ -183,6 +205,7 @@ export function useScheduledPosts(editorialContentId?: string | null, clientId?:
     createScheduledPost,
     updateScheduledPost,
     deleteScheduledPost,
+    hardDeleteScheduledPost,
     publishNow,
   };
 }
