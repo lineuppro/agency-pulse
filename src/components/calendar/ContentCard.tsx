@@ -1,4 +1,6 @@
 import { Instagram, Facebook, FileText, Mail, Megaphone, MoreHorizontal, Check, X, Clock, Send, Eye } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,11 +11,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import type { ContentType, ContentStatus, EditorialContent } from '@/hooks/useEditorialCalendar';
 import { getContentTypeLabel, getContentStatusLabel } from '@/hooks/useEditorialCalendar';
 
 interface ContentCardProps {
-  content: EditorialContent & { _isScheduledPost?: boolean; _scheduledPostStatus?: string };
+  content: EditorialContent & {
+    _isScheduledPost?: boolean;
+    _scheduledPostStatus?: string;
+    _scheduledAt?: string;
+    _mediaUrls?: string[];
+  };
   compact?: boolean;
   isAdmin?: boolean;
   onEdit?: (content: EditorialContent) => void;
@@ -97,8 +109,17 @@ export function ContentCard({
   const StatusIcon = statusConfig[content.status].icon;
   const isScheduledPost = !!(content as any)._isScheduledPost;
 
+  const scheduledPostStatusLabels: Record<string, { label: string; color: string }> = {
+    draft: { label: 'Rascunho', color: 'text-muted-foreground' },
+    scheduled: { label: 'Agendado', color: 'text-amber-600 dark:text-amber-400' },
+    publishing: { label: 'Publicando', color: 'text-blue-600 dark:text-blue-400' },
+    published: { label: 'Publicado', color: 'text-emerald-600 dark:text-emerald-400' },
+    failed: { label: 'Falhou', color: 'text-destructive' },
+    cancelled: { label: 'Cancelado', color: 'text-muted-foreground' },
+  };
+
   if (compact) {
-    return (
+    const compactCard = (
       <button
         onClick={() => onClick?.(content)}
         className={cn(
@@ -113,6 +134,54 @@ export function ContentCard({
         <span className="truncate font-medium">{content.title}</span>
       </button>
     );
+
+    if (isScheduledPost) {
+      const spData = content as any;
+      const spStatus = scheduledPostStatusLabels[spData._scheduledPostStatus] || scheduledPostStatusLabels.scheduled;
+      const mediaUrls: string[] = spData._mediaUrls || [];
+      const scheduledAt = spData._scheduledAt ? new Date(spData._scheduledAt) : null;
+
+      return (
+        <HoverCard openDelay={200} closeDelay={100}>
+          <HoverCardTrigger asChild>
+            {compactCard}
+          </HoverCardTrigger>
+          <HoverCardContent className="w-64 p-3" side="right" align="start">
+            {mediaUrls.length > 0 && (
+              <div className="mb-2 rounded-md overflow-hidden">
+                <img
+                  src={mediaUrls[0]}
+                  alt="Preview"
+                  className="w-full h-32 object-cover"
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              {scheduledAt && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>{format(scheduledAt, "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <div className={cn('p-1 rounded', typeConfig.bgColor)}>
+                  <TypeIcon className={cn('h-3 w-3', typeConfig.color)} />
+                </div>
+                <span className="text-xs font-medium capitalize">{content.content_type}</span>
+              </div>
+              <Badge variant="outline" className={cn('text-xs', spStatus.color)}>
+                {spStatus.label}
+              </Badge>
+              {content.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{content.description}</p>
+              )}
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      );
+    }
+
+    return compactCard;
   }
 
   return (

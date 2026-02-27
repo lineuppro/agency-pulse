@@ -37,7 +37,12 @@ export function useCalendarScheduledPosts(
       if (error) throw error;
 
       // Convert to EditorialContent-compatible format
-      return (data || []).map((post): EditorialContent & { _isScheduledPost: true; _scheduledPostStatus: string } => {
+      return (data || []).map((post): EditorialContent & {
+        _isScheduledPost: true;
+        _scheduledPostStatus: string;
+        _scheduledAt: string;
+        _mediaUrls: string[];
+      } => {
         const platform = post.platform as string;
         let contentType: ContentType = 'other';
         if (platform === 'instagram') contentType = 'instagram';
@@ -68,6 +73,8 @@ export function useCalendarScheduledPosts(
           updated_at: post.updated_at,
           _isScheduledPost: true,
           _scheduledPostStatus: post.status,
+          _scheduledAt: post.scheduled_at,
+          _mediaUrls: (post.media_urls as unknown as string[]) || [],
         };
       });
     },
