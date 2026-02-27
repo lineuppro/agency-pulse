@@ -19,6 +19,7 @@ import {
   type ContentType
 } from '@/hooks/useEditorialCalendar';
 import { useEditorialCampaigns } from '@/hooks/useEditorialCampaigns';
+import { useCalendarScheduledPosts } from '@/hooks/useCalendarScheduledPosts';
 
 export default function AdminCalendar() {
   const navigate = useNavigate();
@@ -48,12 +49,29 @@ export default function AdminCalendar() {
     }
   }, [currentDate, view]);
 
-  const { contents, isLoading, createContent, updateContent, deleteContent, updateStatus } = useEditorialCalendar(
+  const { contents: editorialContents, isLoading, createContent, updateContent, deleteContent, updateStatus } = useEditorialCalendar(
     selectedClientId === 'all' ? undefined : selectedClientId,
     dateRange.start,
     dateRange.end,
     selectedCampaignId === 'all' ? undefined : selectedCampaignId
   );
+
+  const { data: scheduledPostItems = [] } = useCalendarScheduledPosts(
+    selectedClientId === 'all' ? undefined : selectedClientId,
+    dateRange.start,
+    dateRange.end
+  );
+
+  // Merge editorial contents with scheduled posts (exclude those already linked to editorial content)
+  const contents = useMemo(() => {
+    const unlinkedScheduledPosts = scheduledPostItems.filter(sp => {
+      // Don't show scheduled posts that are already linked to an editorial content
+      return !editorialContents.some(ec => 
+        scheduledPostItems.some(s => s.id === sp.id && s.description === ec.description)
+      );
+    });
+    return [...editorialContents, ...unlinkedScheduledPosts];
+  }, [editorialContents, scheduledPostItems]);
 
   const getCampaignName = (campaignId: string | null) => {
     if (!campaignId) return undefined;
@@ -73,9 +91,13 @@ export default function AdminCalendar() {
   };
 
   const handleEditContent = (content: EditorialContent) => { setEditingContent(content); setIsModalOpen(true); };
-  const handleContentClick = (content: EditorialContent) => { navigate(`/admin/calendar/${content.id}`); };
+  const handleContentClick = (content: EditorialContent) => { 
+    // Scheduled posts (prefixed with sp_) don't have a detail page
+    if (content.id.startsWith('sp_')) return;
+    navigate(`/admin/calendar/${content.id}`); 
+  };
   const handleDeleteContent = (id: string) => { deleteContent.mutate(id, { onSuccess: () => { setIsSidebarOpen(false); setViewingContent(null); } }); };
-  const handleStatusChange = (id: string, status: ContentStatus) => { updateStatus.mutate({ id, status }); };
+  const handleStatusChange = (id: string, status: ContentStatus) => { if (id.startsWith('sp_')) return; updateStatus.mutate({ id, status }); };
   const handleCreateCampaign = (data: Parameters<typeof createCampaign.mutate>[0]) => { createCampaign.mutate(data, { onSuccess: () => { setIsCampaignModalOpen(false); } }); };
 
   return (
